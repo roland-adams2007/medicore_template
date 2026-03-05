@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Super Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"DM Serif Display"', 'serif'],
+            body:    ['"DM Sans"', 'sans-serif'],
+          },
+          colors: {
+            ink:          '#0D1117',
+            paper:        '#F7F4EF',
+            sage:         '#4A7C59',
+            'sage-light': '#6BA37A',
+            'sage-dark':  '#2F5C3A',
+            'sage-pale':  '#E8F2EB',
+            blush:        '#E8927C',
+            'blush-pale': '#FAF0ED',
+            slate:        '#8A9BB0',
+            'slate-light':'#EEF2F7',
+            gold:         '#C9A84C',
+            'gold-pale':  '#FBF6E9',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #F7F4EF; }
+
+    #app { display: flex; height: 100vh; overflow: hidden; position: relative; }
+
+    /* ══ SIDEBAR ══ */
+    #sidebar {
+      width: 260px; background: #0D1117;
+      display: flex; flex-direction: column;
+      flex-shrink: 0; height: 100vh; overflow-y: auto;
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); z-index: 50;
+    }
+    @media (max-width: 1023px) {
+      #sidebar { position: fixed; top:0; left:0; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+    }
+
+    #overlay { display:none; position:fixed; inset:0; background:rgba(13,17,23,0.5); backdrop-filter:blur(2px); z-index:40; }
+    #overlay.show { display:block; }
+
+    #main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    #scroll-area { flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom:72px; }
+    @media (min-width:1024px) { #scroll-area { padding-bottom:24px; } }
+
+    /* ══ NAV ITEMS ══ */
+    .nav-item {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 12px; border-radius:12px;
+      color:#8A9BB0; text-decoration:none; font-size:14px;
+      transition:background 0.15s, color 0.15s;
+      border-left:3px solid transparent;
+    }
+    .nav-item:hover { background:rgba(74,124,89,0.15); color:#fff; }
+    .nav-item.active { background:rgba(74,124,89,0.22); color:#fff; border-left-color:#4A7C59; }
+
+    /* ══ CARDS ══ */
+    .card      { background:#fff; border:1px solid #E8E4DC; border-radius:16px; }
+    .card-sage { background:#4A7C59; border-radius:16px; }
+    .card-blush{ background:#E8927C; border-radius:16px; }
+    .card-ink  { background:#0D1117; border-radius:16px; }
+    .card-gold { background:#C9A84C; border-radius:16px; }
+    .card-deep { background:#1a2d22; border-radius:16px; }
+
+    /* ══ STAT SCROLL ══ */
+    .stat-row {
+      display:flex; gap:14px; overflow-x:auto; padding:0 16px 4px;
+      scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+    }
+    .stat-row::-webkit-scrollbar { display:none; }
+    .stat-snap { scroll-snap-align:start; flex:0 0 75vw; max-width:300px; }
+    @media (min-width:640px) { .stat-snap { flex:0 0 48%; } }
+    @media (min-width:768px) {
+      .stat-row { display:grid; grid-template-columns:repeat(4,1fr); overflow:visible; padding:0; }
+      .stat-snap { flex:none; max-width:none; }
+    }
+
+    /* ══ BADGES ══ */
+    .badge       { font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; letter-spacing:0.03em; white-space:nowrap; }
+    .b-active    { background:#E8F2EB; color:#2F5C3A; }
+    .b-trial     { background:#FBF6E9; color:#8B6A1A; }
+    .b-suspended { background:#FAF0ED; color:#C05C3C; }
+    .b-overdue   { background:#FEE2E2; color:#991B1B; }
+    .b-paid      { background:#E8F2EB; color:#2F5C3A; }
+    .b-new       { background:#F5F0F8; color:#6A3D85; }
+    .b-info      { background:#EEF2F7; color:#4A6580; }
+    .b-warning   { background:#FBF6E9; color:#8B6A1A; }
+    .b-critical  { background:#FEE2E2; color:#991B1B; }
+    .b-ok        { background:#E8F2EB; color:#2F5C3A; }
+
+    /* ══ AVATAR ══ */
+    .av { width:32px; height:32px; border-radius:50%; border:2px solid #fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+
+    /* ══ PROGRESS ══ */
+    .prog      { height:6px; background:#E8E4DC; border-radius:100px; overflow:hidden; }
+    .prog-fill { height:100%; border-radius:100px; }
+
+    /* ══ CHART BAR ══ */
+    .cbar      { background:#E8F2EB; border-radius:8px 8px 0 0; display:flex; align-items:flex-end; }
+    .cbar-fill { background:#4A7C59; border-radius:8px 8px 0 0; width:100%; }
+
+    /* ══ SCROLLBARS ══ */
+    ::-webkit-scrollbar { width:4px; height:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#C8C4BC; border-radius:100px; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .fu { animation:fadeUp 0.4s ease forwards; }
+    .d1{animation-delay:.04s;opacity:0} .d2{animation-delay:.08s;opacity:0}
+    .d3{animation-delay:.12s;opacity:0} .d4{animation-delay:.16s;opacity:0}
+    @keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
+    .pdot { animation:pdot 2s infinite; }
+
+    /* ══ BOTTOM NAV ══ */
+    #bottom-nav {
+      position:fixed; bottom:0; left:0; right:0;
+      background:#0D1117; border-top:1px solid rgba(255,255,255,0.08);
+      display:flex; z-index:45;
+      padding-bottom:env(safe-area-inset-bottom,0px);
+    }
+    @media (min-width:1024px) { #bottom-nav { display:none; } }
+    #bottom-nav a {
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:10px 4px 8px; color:#8A9BB0; font-size:10px;
+      text-decoration:none; transition:color 0.15s;
+    }
+    #bottom-nav a.active, #bottom-nav a:hover { color:#4A7C59; }
+
+    .tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .tbl-wrap table { min-width:600px; }
+
+    /* ══ CLINIC STATUS DOT ══ */
+    .status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+    /* ══ MAP PLACEHOLDER ══ */
+    .map-placeholder {
+      background: linear-gradient(135deg, #0D1117 0%, #0f1f15 50%, #162b1e 100%);
+      border-radius: 12px; position: relative; overflow: hidden;
+    }
+
+    /* ══ SYSTEM HEALTH BAR ══ */
+    .health-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; }
+    .health-row:hover { background: #F7F4EF; }
+
+    @media (min-width:1024px) { #ham-btn { display:none !important; } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+  <aside id="sidebar">
+
+    <!-- Logo -->
+    <div style="padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#4A7C59,#2F5C3A);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="activity" style="width:18px;height:18px;color:#fff;"></i>
+        </div>
+        <div>
+          <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1;">MediCore</p>
+          <p style="color:#4A7C59;font-size:11px;margin-top:2px;font-weight:600;letter-spacing:0.05em;">SUPER ADMIN</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#8A9BB0;background:rgba(255,255,255,0.06);border:none;border-radius:8px;cursor:pointer;">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+
+    <!-- Admin identity -->
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.05);border-radius:12px;">
+        <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0;border:2px solid rgba(255,255,255,0.15);">OA</div>
+        <div style="flex:1;min-width:0;">
+          <p style="color:#fff;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Olumide Adesanya</p>
+          <p style="color:#4A7C59;font-size:11px;margin-top:1px;font-weight:600;">Platform Owner</p>
+        </div>
+        <span style="width:8px;height:8px;background:#4A7C59;border-radius:50%;flex-shrink:0;" class="pdot"></span>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav style="flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:2px;">
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:0 12px 8px;">Platform</p>
+      <a href="#" class="nav-item active"><i data-lucide="layout-dashboard" style="width:17px;height:17px;flex-shrink:0;"></i>Overview</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="building-2" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">All Clinics</span>
+        <span style="font-size:11px;background:#4A7C59;color:#fff;padding:2px 8px;border-radius:20px;">142</span>
+      </a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="user-check" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">Onboarding</span>
+        <span style="font-size:11px;background:#C9A84C;color:#fff;padding:2px 8px;border-radius:20px;">7</span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="users" style="width:17px;height:17px;flex-shrink:0;"></i>All Users</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">Revenue</p>
+      <a href="#" class="nav-item"><i data-lucide="banknote" style="width:17px;height:17px;flex-shrink:0;"></i>Platform Revenue</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="credit-card" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">Subscriptions</span>
+        <span class="pdot" style="width:8px;height:8px;background:#E8927C;border-radius:50%;flex-shrink:0;"></span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="receipt" style="width:17px;height:17px;flex-shrink:0;"></i>Invoices & Billing</a>
+      <a href="#" class="nav-item"><i data-lucide="bar-chart-2" style="width:17px;height:17px;flex-shrink:0;"></i>Financial Reports</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">System</p>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="server" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">System Health</span>
+        <span style="width:8px;height:8px;background:#4A7C59;border-radius:50%;flex-shrink:0;" class="pdot"></span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="shield-check" style="width:17px;height:17px;flex-shrink:0;"></i>Security & Audit</a>
+      <a href="#" class="nav-item"><i data-lucide="bell" style="width:17px;height:17px;flex-shrink:0;"></i>Notifications</a>
+      <a href="#" class="nav-item"><i data-lucide="megaphone" style="width:17px;height:17px;flex-shrink:0;"></i>Announcements</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">Config</p>
+      <a href="#" class="nav-item"><i data-lucide="package" style="width:17px;height:17px;flex-shrink:0;"></i>Plans & Pricing</a>
+      <a href="#" class="nav-item"><i data-lucide="plug" style="width:17px;height:17px;flex-shrink:0;"></i>Integrations</a>
+      <a href="#" class="nav-item"><i data-lucide="settings" style="width:17px;height:17px;flex-shrink:0;"></i>Platform Settings</a>
+
+    </nav>
+
+    <!-- Footer -->
+    <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;">
+      <div class="av" style="background:linear-gradient(135deg,#4A7C59,#2F5C3A);color:#fff;font-size:11px;">OA</div>
+      <div style="flex:1;min-width:0;">
+        <p style="color:#fff;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Olumide Adesanya</p>
+        <p style="color:#8A9BB0;font-size:11px;">Super Admin</p>
+      </div>
+      <button style="background:none;border:none;color:#8A9BB0;cursor:pointer;padding:4px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#8A9BB0'">
+        <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════ MAIN ══════════════════════ -->
+  <div id="main">
+
+    <!-- TOP BAR -->
+    <header style="background:rgba(247,244,239,0.95);backdrop-filter:blur(8px);border-bottom:1px solid rgba(13,17,23,0.1);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;flex-shrink:0;">
+
+      <button id="ham-btn" onclick="openSidebar()" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;flex-shrink:0;">
+        <i data-lucide="menu" style="width:17px;height:17px;color:#0D1117;"></i>
+      </button>
+
+      <div style="flex:1;min-width:0;">
+        <h1 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:clamp(16px,3vw,22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          Platform Overview <span style="color:#4A7C59;font-style:italic;">✦</span>
+        </h1>
+        <p style="color:#8A9BB0;font-size:12px;display:none;" id="date-sub">Thursday, 5 March 2026 &nbsp;·&nbsp; 142 active clinics across Nigeria</p>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <!-- Search -->
+        <div id="search-wrap" style="position:relative;display:none;">
+          <i data-lucide="search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#8A9BB0;"></i>
+          <input type="text" placeholder="Search clinics, users…" style="padding:8px 14px 8px 32px;font-size:13px;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;outline:none;width:210px;font-family:'DM Sans',sans-serif;"/>
+        </div>
+        <button id="mob-search" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;">
+          <i data-lucide="search" style="width:17px;height:17px;color:#0D1117;"></i>
+        </button>
+        <!-- Alerts bell -->
+        <button style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;">
+          <i data-lucide="bell" style="width:17px;height:17px;color:#0D1117;"></i>
+          <span style="position:absolute;top:8px;right:8px;width:7px;height:7px;background:#E8927C;border-radius:50%;"></span>
+        </button>
+        <!-- Add clinic CTA -->
+        <button style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#4A7C59;color:#fff;font-size:13px;font-weight:500;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">
+          <i data-lucide="plus" style="width:15px;height:15px;"></i>
+          <span id="cta-label">Add Clinic</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══ SCROLL AREA ══ -->
+    <div id="scroll-area">
+
+      <!-- ── STAT CARDS ── -->
+      <div class="fu d1" style="padding:20px 0 6px;">
+        <div class="stat-row">
+
+          <!-- Total Clinics -->
+          <div class="stat-snap card-sage" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Total Clinics</p>
+                <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:38px;margin-top:6px;line-height:1;">142</p>
+                <p style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">↑ 8 new this month</p>
+              </div>
+              <div style="width:40px;height:40px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="building-2" style="width:20px;height:20px;color:#fff;"></i>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.18);padding:4px 10px;border-radius:8px;">128 Active</span>
+              <span style="font-size:12px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.18);padding:4px 10px;border-radius:8px;">14 Trial</span>
+            </div>
+          </div>
+
+          <!-- MRR -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Monthly Revenue</p>
+                <p style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:32px;margin-top:6px;line-height:1;">₦18.4M</p>
+                <p style="color:#4A7C59;font-size:12px;margin-top:4px;">↑ 23% vs last month</p>
+              </div>
+              <div style="width:40px;height:40px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="trending-up" style="width:20px;height:20px;color:#4A7C59;"></i>
+              </div>
+            </div>
+            <div class="prog" style="margin-top:14px;">
+              <div class="prog-fill" style="width:77%;background:#4A7C59;"></div>
+            </div>
+            <p style="color:#8A9BB0;font-size:12px;margin-top:6px;">77% of ₦24M target</p>
+          </div>
+
+          <!-- Total Users -->
+          <div class="stat-snap card-blush" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Total Users</p>
+                <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:38px;margin-top:6px;line-height:1;">9,481</p>
+                <p style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">↑ 312 new this month</p>
+              </div>
+              <div style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="users" style="width:20px;height:20px;color:#fff;"></i>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:8px;">847 Staff</span>
+              <span style="font-size:12px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:8px;">8,634 Patients</span>
+            </div>
+          </div>
+
+          <!-- Subscriptions alert -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Expiring Soon</p>
+                <p style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:38px;margin-top:6px;line-height:1;">11</p>
+                <p style="color:#E8927C;font-size:12px;margin-top:4px;">Subscriptions due &lt; 7 days</p>
+              </div>
+              <div style="width:40px;height:40px;background:#FAF0ED;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="credit-card" style="width:20px;height:20px;color:#E8927C;"></i>
+              </div>
+            </div>
+            <button style="margin-top:14px;font-size:12px;color:#E8927C;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;">
+              Review now <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+        </div>
+        <p style="text-align:center;font-size:11px;color:rgba(138,155,176,0.5);padding:4px 0 0;" id="swipe-hint">← swipe for more →</p>
+      </div>
+
+      <!-- PADDED CONTENT -->
+      <div style="padding:0 16px 16px;" id="padded-content">
+
+        <!-- ── ROW 2: Revenue Chart + System Health ── -->
+        <div class="fu d2" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;" id="row2">
+
+          <!-- Revenue Chart -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;">
+              <div>
+                <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Platform Revenue</h2>
+                <p style="color:#8A9BB0;font-size:13px;margin-top:2px;">Monthly recurring revenue — 2026</p>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button style="font-size:12px;padding:6px 12px;background:#4A7C59;color:#fff;border:none;border-radius:8px;font-weight:500;cursor:pointer;">MRR</button>
+                <button style="font-size:12px;padding:6px 10px;color:#8A9BB0;background:#EEF2F7;border:none;border-radius:8px;cursor:pointer;">ARR</button>
+                <button style="font-size:12px;padding:6px 10px;color:#8A9BB0;background:#EEF2F7;border:none;border-radius:8px;cursor:pointer;">Clinics</button>
+              </div>
+            </div>
+            <!-- Chart -->
+            <div style="display:flex;align-items:flex-end;gap:6px;height:120px;">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:42%;"><div class="cbar-fill" style="height:42%;"></div></div><span style="font-size:10px;color:#8A9BB0;">Jan</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:55%;"><div class="cbar-fill" style="height:55%;"></div></div><span style="font-size:10px;color:#8A9BB0;">Feb</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:77%;background:#E8F2EB;"><div class="cbar-fill" style="height:77%;background:#2F5C3A;"></div></div><span style="font-size:10px;color:#4A7C59;font-weight:600;">Mar</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:38%;"><div class="cbar-fill" style="height:38%;opacity:0.3;"></div></div><span style="font-size:10px;color:#8A9BB0;">Apr</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:32%;"><div class="cbar-fill" style="height:32%;opacity:0.3;"></div></div><span style="font-size:10px;color:#8A9BB0;">May</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:28%;"><div class="cbar-fill" style="height:28%;opacity:0.3;"></div></div><span style="font-size:10px;color:#8A9BB0;">Jun</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="cbar" style="width:100%;height:25%;"><div class="cbar-fill" style="height:25%;opacity:0.25;"></div></div><span style="font-size:10px;color:#8A9BB0;">Jul</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" class="hidden-xs"><div class="cbar" style="width:100%;height:20%;"><div class="cbar-fill" style="height:20%;opacity:0.2;"></div></div><span style="font-size:10px;color:#8A9BB0;">Aug</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" class="hidden-xs"><div class="cbar" style="width:100%;height:18%;"><div class="cbar-fill" style="height:18%;opacity:0.2;"></div></div><span style="font-size:10px;color:#8A9BB0;">Sep</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" class="hidden-xs"><div class="cbar" style="width:100%;height:15%;"><div class="cbar-fill" style="height:15%;opacity:0.15;"></div></div><span style="font-size:10px;color:#8A9BB0;">Oct</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" class="hidden-xs"><div class="cbar" style="width:100%;height:12%;"><div class="cbar-fill" style="height:12%;opacity:0.12;"></div></div><span style="font-size:10px;color:#8A9BB0;">Nov</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" class="hidden-xs"><div class="cbar" style="width:100%;height:8%;"><div class="cbar-fill" style="height:8%;opacity:0.1;"></div></div><span style="font-size:10px;color:#8A9BB0;">Dec</span></div>
+            </div>
+            <!-- Summary row -->
+            <div style="display:flex;gap:0;margin-top:14px;padding-top:14px;border-top:1px solid rgba(13,17,23,0.06);" id="rev-summary">
+              <div style="flex:1;text-align:center;padding:0 8px;">
+                <p style="font-size:11px;color:#8A9BB0;">This Month</p>
+                <p style="font-family:'DM Serif Display',serif;font-size:20px;color:#0D1117;margin-top:2px;">₦18.4M</p>
+              </div>
+              <div style="width:1px;background:rgba(13,17,23,0.08);"></div>
+              <div style="flex:1;text-align:center;padding:0 8px;">
+                <p style="font-size:11px;color:#8A9BB0;">Last Month</p>
+                <p style="font-family:'DM Serif Display',serif;font-size:20px;color:#0D1117;margin-top:2px;">₦14.9M</p>
+              </div>
+              <div style="width:1px;background:rgba(13,17,23,0.08);"></div>
+              <div style="flex:1;text-align:center;padding:0 8px;">
+                <p style="font-size:11px;color:#8A9BB0;">YTD</p>
+                <p style="font-family:'DM Serif Display',serif;font-size:20px;color:#4A7C59;margin-top:2px;">₦46.1M</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Health -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+              <div>
+                <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">System Health</h2>
+                <p style="color:#8A9BB0;font-size:13px;display:flex;align-items:center;gap:6px;margin-top:2px;">
+                  <span class="pdot" style="width:8px;height:8px;background:#4A7C59;border-radius:50%;display:inline-block;"></span>
+                  All systems operational
+                </p>
+              </div>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">Full status</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:4px;">
+
+              <div class="health-row">
+                <div style="width:32px;height:32px;background:#E8F2EB;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="server" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <p style="font-size:13px;font-weight:500;color:#0D1117;">API Gateway</p>
+                    <span class="badge b-ok">Healthy</span>
+                  </div>
+                  <div class="prog" style="margin-top:5px;"><div class="prog-fill" style="width:98%;background:#4A7C59;"></div></div>
+                  <p style="font-size:11px;color:#8A9BB0;margin-top:3px;">99.8% uptime · 42ms avg latency</p>
+                </div>
+              </div>
+
+              <div class="health-row">
+                <div style="width:32px;height:32px;background:#E8F2EB;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="database" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <p style="font-size:13px;font-weight:500;color:#0D1117;">Database Cluster</p>
+                    <span class="badge b-ok">Healthy</span>
+                  </div>
+                  <div class="prog" style="margin-top:5px;"><div class="prog-fill" style="width:94%;background:#4A7C59;"></div></div>
+                  <p style="font-size:11px;color:#8A9BB0;margin-top:3px;">94% available · 3.1TB used</p>
+                </div>
+              </div>
+
+              <div class="health-row">
+                <div style="width:32px;height:32px;background:#FBF6E9;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="mail" style="width:15px;height:15px;color:#C9A84C;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <p style="font-size:13px;font-weight:500;color:#0D1117;">Email / SMS Service</p>
+                    <span class="badge b-warning">Degraded</span>
+                  </div>
+                  <div class="prog" style="margin-top:5px;"><div class="prog-fill" style="width:72%;background:#C9A84C;"></div></div>
+                  <p style="font-size:11px;color:#C9A84C;margin-top:3px;">Delivery delay ~4 min · Investigating</p>
+                </div>
+              </div>
+
+              <div class="health-row">
+                <div style="width:32px;height:32px;background:#E8F2EB;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="cloud" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <p style="font-size:13px;font-weight:500;color:#0D1117;">File Storage</p>
+                    <span class="badge b-ok">Healthy</span>
+                  </div>
+                  <div class="prog" style="margin-top:5px;"><div class="prog-fill" style="width:61%;background:#4A7C59;"></div></div>
+                  <p style="font-size:11px;color:#8A9BB0;margin-top:3px;">61% used · 12.4TB of 20TB</p>
+                </div>
+              </div>
+
+              <div class="health-row">
+                <div style="width:32px;height:32px;background:#E8F2EB;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="shield" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <p style="font-size:13px;font-weight:500;color:#0D1117;">Auth Service</p>
+                    <span class="badge b-ok">Healthy</span>
+                  </div>
+                  <div class="prog" style="margin-top:5px;"><div class="prog-fill" style="width:99%;background:#4A7C59;"></div></div>
+                  <p style="font-size:11px;color:#8A9BB0;margin-top:3px;">99.9% uptime · 0 failed logins</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div><!-- /row2 -->
+
+        <!-- ── ROW 3: All Clinics Table ── -->
+        <div class="fu d3 card" style="margin-bottom:16px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(13,17,23,0.06);">
+            <div>
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">All Clinics</h2>
+              <p style="color:#8A9BB0;font-size:13px;margin-top:2px;">142 clinics · 128 active · 7 pending onboarding</p>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button style="font-size:12px;padding:6px 12px;background:#4A7C59;color:#fff;border:none;border-radius:8px;font-weight:500;cursor:pointer;">All</button>
+              <button style="font-size:12px;padding:6px 10px;color:#8A9BB0;background:#EEF2F7;border:none;border-radius:8px;cursor:pointer;" class="hidden-xs">Active</button>
+              <button style="font-size:12px;padding:6px 10px;color:#8A9BB0;background:#EEF2F7;border:none;border-radius:8px;cursor:pointer;" class="hidden-xs">Trial</button>
+            </div>
+          </div>
+
+          <div class="tbl-wrap">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.06);">
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 20px;">Clinic</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Plan</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Users</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">MRR</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Renews</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Status</th>
+                  <th style="padding:10px 12px;width:40px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:34px;height:34px;background:#E8F2EB;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4A7C59;flex-shrink:0;">GH</div>
+                      <div><p style="font-size:14px;font-weight:500;color:#0D1117;">Grace Health Clinic</p><p style="font-size:11px;color:#8A9BB0;">Lagos · Main + 2 branches</p></div>
+                    </div>
+                  </td>
+                  <td style="padding:12px;"><span style="font-size:12px;font-weight:600;color:#4A7C59;background:#E8F2EB;padding:3px 8px;border-radius:6px;">Pro</span></td>
+                  <td style="padding:12px;font-size:13px;color:#0D1117;">64</td>
+                  <td style="padding:12px;font-size:13px;font-weight:600;color:#0D1117;">₦450,000</td>
+                  <td style="padding:12px;font-size:12px;color:#8A9BB0;white-space:nowrap;">1 Apr 2026</td>
+                  <td style="padding:12px;"><span class="badge b-active">Active</span></td>
+                  <td style="padding:12px;"><button style="background:none;border:none;cursor:pointer;color:#8A9BB0;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:34px;height:34px;background:#FBF6E9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#C9A84C;flex-shrink:0;">ST</div>
+                      <div><p style="font-size:14px;font-weight:500;color:#0D1117;">Sunrise Total Healthcare</p><p style="font-size:11px;color:#8A9BB0;">Abuja · Single branch</p></div>
+                    </div>
+                  </td>
+                  <td style="padding:12px;"><span style="font-size:12px;font-weight:600;color:#C9A84C;background:#FBF6E9;padding:3px 8px;border-radius:6px;">Starter</span></td>
+                  <td style="padding:12px;font-size:13px;color:#0D1117;">18</td>
+                  <td style="padding:12px;font-size:13px;font-weight:600;color:#0D1117;">₦120,000</td>
+                  <td style="padding:12px;font-size:12px;color:#E8927C;font-weight:600;white-space:nowrap;">6 Mar 2026</td>
+                  <td style="padding:12px;"><span class="badge b-overdue">Due Today</span></td>
+                  <td style="padding:12px;"><button style="background:none;border:none;cursor:pointer;color:#8A9BB0;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:34px;height:34px;background:#F5F0F8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#6A3D85;flex-shrink:0;">NP</div>
+                      <div><p style="font-size:14px;font-weight:500;color:#0D1117;">Nova Prime Medical</p><p style="font-size:11px;color:#8A9BB0;">Port Harcourt · 1 branch</p></div>
+                    </div>
+                  </td>
+                  <td style="padding:12px;"><span style="font-size:12px;font-weight:600;color:#6A3D85;background:#F5F0F8;padding:3px 8px;border-radius:6px;">Trial</span></td>
+                  <td style="padding:12px;font-size:13px;color:#0D1117;">9</td>
+                  <td style="padding:12px;font-size:13px;color:#8A9BB0;">—</td>
+                  <td style="padding:12px;font-size:12px;color:#C9A84C;font-weight:600;white-space:nowrap;">Trial ends 12 Mar</td>
+                  <td style="padding:12px;"><span class="badge b-trial">Trial</span></td>
+                  <td style="padding:12px;"><button style="background:none;border:none;cursor:pointer;color:#8A9BB0;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:34px;height:34px;background:#E8F2EB;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4A7C59;flex-shrink:0;">HC</div>
+                      <div><p style="font-size:14px;font-weight:500;color:#0D1117;">Harmony Care Hospital</p><p style="font-size:11px;color:#8A9BB0;">Kano · 3 branches</p></div>
+                    </div>
+                  </td>
+                  <td style="padding:12px;"><span style="font-size:12px;font-weight:600;color:#0D1117;background:#0D1117;padding:3px 8px;border-radius:6px;color:#fff;">Enterprise</span></td>
+                  <td style="padding:12px;font-size:13px;color:#0D1117;">210</td>
+                  <td style="padding:12px;font-size:13px;font-weight:600;color:#0D1117;">₦1,200,000</td>
+                  <td style="padding:12px;font-size:12px;color:#8A9BB0;white-space:nowrap;">1 Jun 2026</td>
+                  <td style="padding:12px;"><span class="badge b-active">Active</span></td>
+                  <td style="padding:12px;"><button style="background:none;border:none;cursor:pointer;color:#8A9BB0;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:34px;height:34px;background:#FAF0ED;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#E8927C;flex-shrink:0;">BM</div>
+                      <div><p style="font-size:14px;font-weight:500;color:#0D1117;">BrightMed Clinic</p><p style="font-size:11px;color:#8A9BB0;">Ibadan · 1 branch</p></div>
+                    </div>
+                  </td>
+                  <td style="padding:12px;"><span style="font-size:12px;font-weight:600;color:#C9A84C;background:#FBF6E9;padding:3px 8px;border-radius:6px;">Starter</span></td>
+                  <td style="padding:12px;font-size:13px;color:#0D1117;">12</td>
+                  <td style="padding:12px;font-size:13px;font-weight:600;color:#0D1117;">₦120,000</td>
+                  <td style="padding:12px;font-size:12px;color:#8A9BB0;white-space:nowrap;">15 Mar 2026</td>
+                  <td style="padding:12px;"><span class="badge b-suspended">Suspended</span></td>
+                  <td style="padding:12px;"><button style="background:none;border:none;cursor:pointer;color:#8A9BB0;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+
+                <tr>
+                  <td style="padding:12px 20px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:34px;height:34px;background:#EEF2F7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#8A9BB0;flex-shrink:0;">VC</div>
+                      <div><p style="font-size:14px;font-weight:500;color:#0D1117;">VitalCare Medical Centre</p><p style="font-size:11px;color:#8A9BB0;">Enugu · 1 branch</p></div>
+                    </div>
+                  </td>
+                  <td style="padding:12px;"><span style="font-size:12px;font-weight:600;color:#4A7C59;background:#E8F2EB;padding:3px 8px;border-radius:6px;">Pro</span></td>
+                  <td style="padding:12px;font-size:13px;color:#0D1117;">31</td>
+                  <td style="padding:12px;font-size:13px;font-weight:600;color:#0D1117;">₦450,000</td>
+                  <td style="padding:12px;font-size:12px;color:#8A9BB0;white-space:nowrap;">22 Mar 2026</td>
+                  <td style="padding:12px;"><span class="badge b-active">Active</span></td>
+                  <td style="padding:12px;"><button style="background:none;border:none;cursor:pointer;color:#8A9BB0;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+
+          <div style="padding:12px 20px;border-top:1px solid rgba(13,17,23,0.06);display:flex;align-items:center;justify-content:space-between;">
+            <p style="font-size:12px;color:#8A9BB0;">Showing 6 of 142 clinics</p>
+            <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+              View all clinics <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── ROW 4: Pending Onboarding + Subscription Alerts + Platform Activity ── -->
+        <div class="fu d4" style="display:grid;grid-template-columns:1fr;gap:16px;" id="row4">
+
+          <!-- Pending Onboarding -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Pending Onboarding</h2>
+              <span class="badge b-trial">7 Pending</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#E8F2EB;border-radius:10px;border-left:3px solid #4A7C59;">
+                <div style="width:34px;height:34px;background:#4A7C59;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">LF</div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">LifeFirst Hospital</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Benin City · Applied 4 Mar · Pro plan</p>
+                </div>
+                <button style="font-size:11px;background:#4A7C59;color:#fff;padding:5px 10px;border:none;border-radius:7px;font-weight:600;cursor:pointer;flex-shrink:0;">Approve</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FBF6E9;border-radius:10px;border-left:3px solid #C9A84C;">
+                <div style="width:34px;height:34px;background:#C9A84C;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">WC</div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">WellCare Clinic</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Owerri · Applied 3 Mar · Starter plan</p>
+                </div>
+                <button style="font-size:11px;color:#C9A84C;background:#FBF6E9;padding:5px 10px;border:1px solid rgba(201,168,76,0.3);border-radius:7px;font-weight:600;cursor:pointer;flex-shrink:0;">Review</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#EEF2F7;border-radius:10px;border-left:3px solid #8A9BB0;">
+                <div style="width:34px;height:34px;background:#EEF2F7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#8A9BB0;flex-shrink:0;">MP</div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MediPlus</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Kaduna · Applied 1 Mar · Docs pending</p>
+                </div>
+                <button style="font-size:11px;color:#4A7C59;background:#E8F2EB;padding:5px 10px;border:none;border-radius:7px;font-weight:600;cursor:pointer;flex-shrink:0;">Follow up</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#EEF2F7;border-radius:10px;border-left:3px solid #8A9BB0;">
+                <div style="width:34px;height:34px;background:#EEF2F7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#8A9BB0;flex-shrink:0;">HN</div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">HealthNow Clinic</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Warri · Applied 28 Feb · Under review</p>
+                </div>
+                <button style="font-size:11px;color:#4A7C59;background:#E8F2EB;padding:5px 10px;border:none;border-radius:7px;font-weight:600;cursor:pointer;flex-shrink:0;">Review</button>
+              </div>
+
+            </div>
+            <button style="margin-top:12px;width:100%;font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+              View all 7 applications <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+          <!-- Subscription Alerts -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Subscription Alerts</h2>
+              <span class="badge b-overdue">11 Due</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FEE2E2;border-radius:10px;border-left:3px solid #E8927C;">
+                <i data-lucide="alert-circle" style="width:16px;height:16px;color:#991B1B;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sunrise Total Healthcare</p>
+                  <p style="font-size:11px;color:#8A9BB0;">₦120,000 · Overdue — due today</p>
+                </div>
+                <button style="font-size:11px;background:#E8927C;color:#fff;padding:5px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">Notify</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FAF0ED;border-radius:10px;border-left:3px solid #E8927C;">
+                <i data-lucide="alert-circle" style="width:16px;height:16px;color:#E8927C;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">BrightMed Clinic</p>
+                  <p style="font-size:11px;color:#8A9BB0;">₦120,000 · Due in 2 days · Suspended</p>
+                </div>
+                <button style="font-size:11px;color:#4A7C59;background:#E8F2EB;padding:5px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">Reinstate</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FBF6E9;border-radius:10px;border-left:3px solid #C9A84C;">
+                <i data-lucide="clock" style="width:16px;height:16px;color:#C9A84C;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">VitalCare Medical Centre</p>
+                  <p style="font-size:11px;color:#8A9BB0;">₦450,000 · Due in 17 days</p>
+                </div>
+                <button style="font-size:11px;color:#C9A84C;background:#FBF6E9;padding:5px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">Remind</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FBF6E9;border-radius:10px;border-left:3px solid #C9A84C;">
+                <i data-lucide="clock" style="width:16px;height:16px;color:#C9A84C;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Nova Prime Medical</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Trial ends in 7 days · Convert to paid</p>
+                </div>
+                <button style="font-size:11px;color:#4A7C59;background:#E8F2EB;padding:5px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">Convert</button>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Platform Activity Log -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Platform Activity</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">Full log</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0;">
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="building-2" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">New clinic onboarded</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Harmony Care Hospital · Kano · Enterprise</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">Today · 07:30 AM</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#FAF0ED;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="credit-card" style="width:13px;height:13px;color:#E8927C;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Subscription renewed</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Grace Health Clinic · ₦450,000 received</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">Today · 06:14 AM</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#FBF6E9;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="alert-triangle" style="width:13px;height:13px;color:#C9A84C;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Email service degraded</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Delivery delay detected · Team notified</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">Today · 05:52 AM</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#FAF0ED;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="x-circle" style="width:13px;height:13px;color:#E8927C;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Clinic suspended</p>
+                  <p style="font-size:12px;color:#8A9BB0;">BrightMed Clinic · Non-payment 15 days</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">Yesterday · 11:00 PM</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="user-plus" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                </div>
+                <div>
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">New admin registered</p>
+                  <p style="font-size:12px;color:#8A9BB0;">VitalCare Medical Centre · Enugu</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">Yesterday · 03:40 PM</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div><!-- /row4 -->
+
+      </div><!-- /padded-content -->
+    </div><!-- /scroll-area -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ══ BOTTOM NAV ══ -->
+<nav id="bottom-nav">
+  <a href="#" class="active">
+    <i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i>
+    <span>Overview</span>
+  </a>
+  <a href="#">
+    <i data-lucide="building-2" style="width:20px;height:20px;"></i>
+    <span>Clinics</span>
+  </a>
+  <a href="#">
+    <i data-lucide="banknote" style="width:20px;height:20px;"></i>
+    <span>Revenue</span>
+  </a>
+  <a href="#">
+    <i data-lucide="server" style="width:20px;height:20px;"></i>
+    <span>System</span>
+  </a>
+  <a href="#">
+    <i data-lucide="settings" style="width:20px;height:20px;"></i>
+    <span>Config</span>
+  </a>
+</nav>
+
+<script>
+  lucide.createIcons();
+
+  function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('overlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+    document.body.style.overflow = '';
+  }
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 1024) closeSidebar();
+  });
+
+  function applyLayout() {
+    const w = window.innerWidth;
+    const row2 = document.getElementById('row2');
+    const row4 = document.getElementById('row4');
+    const revSummary = document.getElementById('rev-summary');
+    const dateSub   = document.getElementById('date-sub');
+    const searchWrap = document.getElementById('search-wrap');
+    const mobSearch  = document.getElementById('mob-search');
+    const ctaLabel   = document.getElementById('cta-label');
+    const swipeHint  = document.getElementById('swipe-hint');
+    const padded     = document.getElementById('padded-content');
+
+    dateSub.style.display    = w >= 640 ? 'block' : 'none';
+    searchWrap.style.display = w >= 768 ? 'flex'  : 'none';
+    mobSearch.style.display  = w >= 768 ? 'none'  : 'flex';
+    ctaLabel.textContent     = w >= 480 ? 'Add Clinic' : 'Add';
+    if (swipeHint) swipeHint.style.display = w >= 768 ? 'none' : 'block';
+    padded.style.padding = w >= 768 ? '0 24px 24px' : '0 16px 16px';
+
+    // Row 2: chart + system health
+    if (row2) row2.style.gridTemplateColumns = w >= 1024 ? '1.5fr 1fr' : '1fr';
+
+    // Revenue summary: stack on small
+    if (revSummary) revSummary.style.flexDirection = w >= 480 ? 'row' : 'column';
+
+    // Row 4: 3-col lg | 2-col md | 1-col sm
+    if (row4) {
+      if (w >= 1024)     row4.style.gridTemplateColumns = '1fr 1fr 1fr';
+      else if (w >= 640) row4.style.gridTemplateColumns = '1fr 1fr';
+      else               row4.style.gridTemplateColumns = '1fr';
+    }
+  }
+
+  applyLayout();
+  window.addEventListener('resize', applyLayout);
+</script>
+</body>
+</html>

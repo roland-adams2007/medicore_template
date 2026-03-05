@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Doctor Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"DM Serif Display"', 'serif'],
+            body: ['"DM Sans"', 'sans-serif'],
+          },
+          colors: {
+            ink: '#0D1117',
+            paper: '#F7F4EF',
+            sage: '#4A7C59',
+            'sage-light': '#6BA37A',
+            'sage-dark': '#2F5C3A',
+            'sage-pale': '#E8F2EB',
+            blush: '#E8927C',
+            'blush-pale': '#FAF0ED',
+            slate: '#8A9BB0',
+            'slate-light': '#EEF2F7',
+            gold: '#C9A84C',
+            'gold-pale': '#FBF6E9',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #F7F4EF; }
+
+    /* ══ LAYOUT ══ */
+    #app { display: flex; height: 100vh; overflow: hidden; position: relative; }
+
+    /* ══ SIDEBAR ══ */
+    #sidebar {
+      width: 260px;
+      background: #0D1117;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      height: 100vh;
+      overflow-y: auto;
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+      z-index: 50;
+    }
+    @media (max-width: 1023px) {
+      #sidebar { position: fixed; top: 0; left: 0; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+    }
+
+    /* ══ OVERLAY ══ */
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(13,17,23,0.5); backdrop-filter: blur(2px); z-index: 40; }
+    #overlay.show { display: block; }
+
+    /* ══ MAIN ══ */
+    #main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 72px; }
+    @media (min-width: 1024px) { #scroll-area { padding-bottom: 24px; } }
+
+    /* ══ NAV ITEMS ══ */
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 12px;
+      color: #8A9BB0; text-decoration: none; font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: rgba(74,124,89,0.15); color: #fff; }
+    .nav-item.active { background: rgba(74,124,89,0.22); color: #fff; border-left-color: #4A7C59; }
+
+    /* ══ CARDS ══ */
+    .card { background: #fff; border: 1px solid #E8E4DC; border-radius: 16px; }
+    .card-sage { background: #4A7C59; border-radius: 16px; }
+    .card-blush { background: #E8927C; border-radius: 16px; }
+    .card-ink  { background: #0D1117; border-radius: 16px; }
+
+    /* ══ STAT SCROLL ROW ══ */
+    .stat-row {
+      display: flex; gap: 14px;
+      overflow-x: auto; padding: 0 16px 4px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .stat-row::-webkit-scrollbar { display: none; }
+    .stat-snap { scroll-snap-align: start; flex: 0 0 75vw; max-width: 300px; }
+    @media (min-width: 640px) { .stat-snap { flex: 0 0 48%; } }
+    @media (min-width: 768px) {
+      .stat-row { display: grid; grid-template-columns: repeat(4,1fr); overflow: visible; padding: 0; }
+      .stat-snap { flex: none; max-width: none; }
+    }
+
+    /* ══ BADGES ══ */
+    .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; letter-spacing: 0.03em; white-space: nowrap; }
+    .b-scheduled { background: #E8F2EB; color: #2F5C3A; }
+    .b-checkin   { background: #FBF6E9; color: #8B6A1A; }
+    .b-completed { background: #EEF2F7; color: #4A6580; }
+    .b-cancelled { background: #FAF0ED; color: #C05C3C; }
+    .b-noshow    { background: #F5F0F8; color: #6A3D85; }
+    .b-critical  { background: #FEE2E2; color: #991B1B; }
+    .b-stable    { background: #E8F2EB; color: #2F5C3A; }
+    .b-review    { background: #FBF6E9; color: #8B6A1A; }
+
+    /* ══ AVATAR ══ */
+    .av { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    .av-lg { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+
+    /* ══ PROGRESS ══ */
+    .prog { height: 6px; background: #E8E4DC; border-radius: 100px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 100px; }
+
+    /* ══ SCROLLBARS ══ */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C8C4BC; border-radius: 100px; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .fu { animation: fadeUp 0.4s ease forwards; }
+    .d1{animation-delay:.04s;opacity:0} .d2{animation-delay:.08s;opacity:0}
+    .d3{animation-delay:.12s;opacity:0} .d4{animation-delay:.16s;opacity:0}
+
+    @keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
+    .pdot { animation: pdot 2s infinite; }
+
+    /* ══ BOTTOM NAV ══ */
+    #bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0D1117; border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex; z-index: 45;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 1024px) { #bottom-nav { display: none; } }
+    #bottom-nav a {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 10px 4px 8px; color: #8A9BB0; font-size: 10px;
+      text-decoration: none; transition: color 0.15s;
+    }
+    #bottom-nav a.active, #bottom-nav a:hover { color: #4A7C59; }
+
+    /* ══ TABLE WRAP ══ */
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tbl-wrap table { min-width: 520px; }
+
+    /* ══ TIMELINE SLOT ══ */
+    .time-slot { display: flex; gap: 12px; align-items: flex-start; }
+    .time-line { display: flex; flex-direction: column; align-items: center; gap: 0; }
+    .time-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .time-connector { width: 2px; flex: 1; background: rgba(13,17,23,0.08); min-height: 28px; }
+
+    @media (min-width: 1024px) { #ham-btn { display: none !important; } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ OVERLAY ══ -->
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+  <aside id="sidebar">
+
+    <!-- Logo -->
+    <div style="padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:#4A7C59;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="activity" style="width:18px;height:18px;color:#fff;"></i>
+        </div>
+        <div>
+          <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1;">MediCore</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:2px;">Doctor Portal</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#8A9BB0;background:rgba(255,255,255,0.06);border:none;border-radius:8px;cursor:pointer;">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+
+    <!-- Doctor identity card -->
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.05);border-radius:12px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:#4A7C59;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;border:2px solid rgba(255,255,255,0.15);">AO</div>
+        <div style="flex:1;min-width:0;">
+          <p style="color:#fff;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Dr. Adaeze Obi</p>
+          <p style="color:#4A7C59;font-size:11px;margin-top:1px;">General Practice</p>
+        </div>
+        <span style="width:8px;height:8px;background:#4A7C59;border-radius:50%;flex-shrink:0;" class="pdot"></span>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav style="flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:2px;">
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:0 12px 8px;">My Work</p>
+      <a href="#" class="nav-item active"><i data-lucide="layout-dashboard" style="width:17px;height:17px;flex-shrink:0;"></i>Dashboard</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="calendar-days" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">My Schedule</span>
+        <span style="font-size:11px;background:#4A7C59;color:#fff;padding:2px 8px;border-radius:20px;">12</span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="users" style="width:17px;height:17px;flex-shrink:0;"></i>My Patients</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="stethoscope" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">Consultations</span>
+        <span style="font-size:11px;background:#4A7C59;color:#fff;padding:2px 8px;border-radius:20px;">3</span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="clipboard-list" style="width:17px;height:17px;flex-shrink:0;"></i>Medical Records</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">Clinical</p>
+      <a href="#" class="nav-item"><i data-lucide="pill" style="width:17px;height:17px;flex-shrink:0;"></i>Prescriptions</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="flask-conical" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">Lab Requests</span>
+        <span class="pdot" style="width:8px;height:8px;background:#E8927C;border-radius:50%;flex-shrink:0;"></span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="file-heart" style="width:17px;height:17px;flex-shrink:0;"></i>Patient Notes</a>
+      <a href="#" class="nav-item"><i data-lucide="scan-heart" style="width:17px;height:17px;flex-shrink:0;"></i>Vitals & Triage</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">Account</p>
+      <a href="#" class="nav-item"><i data-lucide="user-circle" style="width:17px;height:17px;flex-shrink:0;"></i>My Profile</a>
+      <a href="#" class="nav-item"><i data-lucide="settings" style="width:17px;height:17px;flex-shrink:0;"></i>Settings</a>
+
+    </nav>
+
+    <!-- User footer -->
+    <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;">
+      <div class="av" style="background:#4A7C59;color:#fff;font-size:11px;">AO</div>
+      <div style="flex:1;min-width:0;">
+        <p style="color:#fff;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Dr. Adaeze Obi</p>
+        <p style="color:#8A9BB0;font-size:11px;">On Duty · Gen. Practice</p>
+      </div>
+      <button style="background:none;border:none;color:#8A9BB0;cursor:pointer;padding:4px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#8A9BB0'">
+        <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════ MAIN ══════════════════════ -->
+  <div id="main">
+
+    <!-- TOP BAR -->
+    <header style="background:rgba(247,244,239,0.95);backdrop-filter:blur(8px);border-bottom:1px solid rgba(13,17,23,0.1);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;flex-shrink:0;">
+
+      <button id="ham-btn" onclick="openSidebar()" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;flex-shrink:0;">
+        <i data-lucide="menu" style="width:17px;height:17px;color:#0D1117;"></i>
+      </button>
+
+      <div style="flex:1;min-width:0;">
+        <h1 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:clamp(16px,3vw,22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          Good morning, Dr. Obi <span style="color:#4A7C59;font-style:italic;">✦</span>
+        </h1>
+        <p style="color:#8A9BB0;font-size:12px;display:none;" id="date-sub">Thursday, 5 March 2026 &nbsp;·&nbsp; 12 patients today</p>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <div id="search-wrap" style="position:relative;display:none;">
+          <i data-lucide="search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#8A9BB0;"></i>
+          <input type="text" placeholder="Search patients…" style="padding:8px 14px 8px 32px;font-size:13px;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;outline:none;width:200px;font-family:'DM Sans',sans-serif;"/>
+        </div>
+        <button id="mob-search" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;">
+          <i data-lucide="search" style="width:17px;height:17px;color:#0D1117;"></i>
+        </button>
+        <button style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;">
+          <i data-lucide="bell" style="width:17px;height:17px;color:#0D1117;"></i>
+          <span style="position:absolute;top:8px;right:8px;width:7px;height:7px;background:#E8927C;border-radius:50%;"></span>
+        </button>
+        <!-- Start Consultation CTA -->
+        <button style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#4A7C59;color:#fff;font-size:13px;font-weight:500;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">
+          <i data-lucide="stethoscope" style="width:15px;height:15px;"></i>
+          <span id="cta-label">Start Consult</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══ SCROLL AREA ══ -->
+    <div id="scroll-area">
+
+      <!-- ── STAT CARDS ── -->
+      <div class="fu d1" style="padding:20px 0 6px;">
+        <div class="stat-row">
+
+          <!-- Today's Patients -->
+          <div class="stat-snap card-sage" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Today's Patients</p>
+                <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:38px;margin-top:6px;line-height:1;">12</p>
+                <p style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">3 seen · 9 remaining</p>
+              </div>
+              <div style="width:40px;height:40px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="users" style="width:20px;height:20px;color:#fff;"></i>
+              </div>
+            </div>
+            <div class="prog" style="margin-top:16px;background:rgba(255,255,255,0.2);">
+              <div class="prog-fill" style="width:25%;background:#fff;"></div>
+            </div>
+            <p style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:6px;">25% complete</p>
+          </div>
+
+          <!-- Next Patient -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Next Patient</p>
+                <p style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:22px;margin-top:8px;line-height:1.2;">Chioma Eze</p>
+                <p style="color:#8A9BB0;font-size:12px;margin-top:4px;">Hypertension follow-up</p>
+              </div>
+              <div style="width:40px;height:40px;background:#4A7C59;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:13px;font-weight:700;">CE</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+              <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#4A7C59;font-weight:600;">
+                <i data-lucide="clock" style="width:13px;height:13px;"></i> 09:00 AM · Room 3
+              </span>
+              <button style="font-size:12px;background:#E8F2EB;color:#4A7C59;padding:5px 12px;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Call In</button>
+            </div>
+          </div>
+
+          <!-- Pending Lab Results -->
+          <div class="stat-snap card-blush" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Pending Labs</p>
+                <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:38px;margin-top:6px;line-height:1;">5</p>
+                <p style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">Results awaiting review</p>
+              </div>
+              <div style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="flask-conical" style="width:20px;height:20px;color:#fff;"></i>
+              </div>
+            </div>
+            <button style="margin-top:16px;font-size:12px;color:rgba(255,255,255,0.9);font-weight:600;background:rgba(255,255,255,0.2);border:none;border-radius:8px;padding:6px 14px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+              Review now <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+          <!-- Prescriptions Written -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Prescriptions Today</p>
+                <p style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:38px;margin-top:6px;line-height:1;">8</p>
+                <p style="color:#C9A84C;font-size:12px;margin-top:4px;">↑ 2 more than yesterday</p>
+              </div>
+              <div style="width:40px;height:40px;background:#FBF6E9;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="pill" style="width:20px;height:20px;color:#C9A84C;"></i>
+              </div>
+            </div>
+            <button style="margin-top:16px;font-size:12px;color:#C9A84C;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;">
+              View all <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+        </div>
+        <p style="text-align:center;font-size:11px;color:rgba(138,155,176,0.5);padding:4px 0 0;" id="swipe-hint">← swipe for more →</p>
+      </div>
+
+      <!-- PADDED CONTENT -->
+      <div style="padding:0 16px 16px;" id="padded-content">
+
+        <!-- ── ROW 2: Today's Schedule (Timeline) + Active Consultation ── -->
+        <div class="fu d2" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;" id="row2">
+
+          <!-- Today's Schedule — Timeline style -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+              <div>
+                <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Today's Schedule</h2>
+                <p style="color:#8A9BB0;font-size:13px;margin-top:2px;">Thursday, 5 March · 12 appointments</p>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <button style="font-size:12px;padding:6px 12px;background:#4A7C59;color:#fff;border:none;border-radius:8px;font-weight:500;cursor:pointer;">Day</button>
+                <button style="font-size:12px;padding:6px 10px;color:#8A9BB0;background:#EEF2F7;border:none;border-radius:8px;cursor:pointer;">Week</button>
+              </div>
+            </div>
+
+            <!-- Timeline slots -->
+            <div style="display:flex;flex-direction:column;gap:0;">
+
+              <!-- Completed -->
+              <div class="time-slot" style="opacity:0.55;">
+                <div style="width:60px;flex-shrink:0;text-align:right;padding-top:2px;">
+                  <p style="font-size:12px;font-weight:600;color:#8A9BB0;">08:00</p>
+                </div>
+                <div class="time-line" style="margin:0 12px;">
+                  <div class="time-dot" style="background:#EEF2F7;border:2px solid #8A9BB0;"></div>
+                  <div class="time-connector"></div>
+                </div>
+                <div style="flex:1;padding-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F9F8F6;border-radius:10px;border:1px solid #E8E4DC;">
+                    <div class="av" style="background:#EEF2F7;color:#8A9BB0;font-size:10px;border-color:#EEF2F7;">FN</div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:13px;font-weight:500;color:#8A9BB0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Fatima Nwosu</p>
+                      <p style="font-size:11px;color:#8A9BB0;">Diabetes check-up · Completed</p>
+                    </div>
+                    <span class="badge b-completed">Done</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Completed -->
+              <div class="time-slot" style="opacity:0.55;">
+                <div style="width:60px;flex-shrink:0;text-align:right;padding-top:2px;">
+                  <p style="font-size:12px;font-weight:600;color:#8A9BB0;">08:30</p>
+                </div>
+                <div class="time-line" style="margin:0 12px;">
+                  <div class="time-dot" style="background:#EEF2F7;border:2px solid #8A9BB0;"></div>
+                  <div class="time-connector"></div>
+                </div>
+                <div style="flex:1;padding-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F9F8F6;border-radius:10px;border:1px solid #E8E4DC;">
+                    <div class="av" style="background:#EEF2F7;color:#8A9BB0;font-size:10px;border-color:#EEF2F7;">KU</div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:13px;font-weight:500;color:#8A9BB0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Kunle Adeola</p>
+                      <p style="font-size:11px;color:#8A9BB0;">Blood pressure review · Completed</p>
+                    </div>
+                    <span class="badge b-completed">Done</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- In Progress (active) -->
+              <div class="time-slot">
+                <div style="width:60px;flex-shrink:0;text-align:right;padding-top:2px;">
+                  <p style="font-size:12px;font-weight:700;color:#4A7C59;">09:00</p>
+                </div>
+                <div class="time-line" style="margin:0 12px;">
+                  <div class="time-dot pdot" style="background:#4A7C59;width:12px;height:12px;"></div>
+                  <div class="time-connector" style="background:#4A7C59;opacity:0.3;"></div>
+                </div>
+                <div style="flex:1;padding-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:#E8F2EB;border-radius:10px;border:1.5px solid #4A7C59;">
+                    <div class="av" style="background:#4A7C59;color:#fff;font-size:10px;border-color:#4A7C59;">CE</div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chioma Eze</p>
+                      <p style="font-size:11px;color:#4A7C59;font-weight:500;">Hypertension follow-up · In Progress</p>
+                    </div>
+                    <button style="font-size:12px;background:#4A7C59;color:#fff;padding:5px 12px;border:none;border-radius:8px;font-weight:600;cursor:pointer;white-space:nowrap;">Open</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Upcoming -->
+              <div class="time-slot">
+                <div style="width:60px;flex-shrink:0;text-align:right;padding-top:2px;">
+                  <p style="font-size:12px;font-weight:600;color:#0D1117;">09:45</p>
+                </div>
+                <div class="time-line" style="margin:0 12px;">
+                  <div class="time-dot" style="background:#fff;border:2px solid #C8C4BC;"></div>
+                  <div class="time-connector"></div>
+                </div>
+                <div style="flex:1;padding-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-radius:10px;border:1px solid #E8E4DC;">
+                    <div class="av" style="background:#C9A84C;color:#fff;font-size:10px;border-color:#C9A84C;">FA</div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Femi Adeyemi</p>
+                      <p style="font-size:11px;color:#8A9BB0;">Cardiac follow-up · ~45 min</p>
+                    </div>
+                    <span class="badge b-scheduled">Next</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Upcoming -->
+              <div class="time-slot">
+                <div style="width:60px;flex-shrink:0;text-align:right;padding-top:2px;">
+                  <p style="font-size:12px;font-weight:600;color:#0D1117;">10:30</p>
+                </div>
+                <div class="time-line" style="margin:0 12px;">
+                  <div class="time-dot" style="background:#fff;border:2px solid #C8C4BC;"></div>
+                  <div class="time-connector"></div>
+                </div>
+                <div style="flex:1;padding-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-radius:10px;border:1px solid #E8E4DC;">
+                    <div class="av" style="background:#E8927C;color:#fff;font-size:10px;border-color:#E8927C;">NN</div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ngozi Nnadi</p>
+                      <p style="font-size:11px;color:#8A9BB0;">New patient · General complaint</p>
+                    </div>
+                    <span class="badge b-scheduled">Upcoming</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Upcoming -->
+              <div class="time-slot">
+                <div style="width:60px;flex-shrink:0;text-align:right;padding-top:2px;">
+                  <p style="font-size:12px;font-weight:600;color:#0D1117;">11:15</p>
+                </div>
+                <div class="time-line" style="margin:0 12px;">
+                  <div class="time-dot" style="background:#fff;border:2px solid #C8C4BC;"></div>
+                </div>
+                <div style="flex:1;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-radius:10px;border:1px solid #E8E4DC;">
+                    <div class="av" style="background:#8A9BB0;color:#fff;font-size:10px;border-color:#8A9BB0;">BA</div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Blessing Agu</p>
+                      <p style="font-size:11px;color:#8A9BB0;">Routine check-up</p>
+                    </div>
+                    <span class="badge b-scheduled">Upcoming</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <button style="margin-top:14px;width:100%;font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+              View full day <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+          <!-- Active Consultation Panel -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+
+            <!-- Current Patient Card -->
+            <div class="card-ink" style="padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span class="pdot" style="width:8px;height:8px;background:#4A7C59;border-radius:50%;display:inline-block;"></span>
+                  <p style="color:rgba(255,255,255,0.6);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Active Consultation</p>
+                </div>
+                <span style="font-size:11px;background:rgba(74,124,89,0.25);color:#6BA37A;padding:3px 10px;border-radius:20px;font-weight:600;">09:00 AM</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div style="width:48px;height:48px;border-radius:50%;background:#4A7C59;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;flex-shrink:0;border:2px solid rgba(255,255,255,0.15);">CE</div>
+                <div>
+                  <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1.2;">Chioma Eze</p>
+                  <p style="color:#8A9BB0;font-size:12px;margin-top:3px;">29F · P-00421 · Room 3</p>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                <div style="padding:10px 12px;background:rgba(255,255,255,0.06);border-radius:10px;">
+                  <p style="font-size:10px;color:#8A9BB0;text-transform:uppercase;letter-spacing:0.05em;">Blood Pressure</p>
+                  <p style="font-size:16px;font-weight:700;color:#fff;margin-top:4px;">148<span style="font-size:12px;font-weight:400;color:#8A9BB0;">/92</span></p>
+                  <p style="font-size:10px;color:#E8927C;margin-top:2px;">↑ Elevated</p>
+                </div>
+                <div style="padding:10px 12px;background:rgba(255,255,255,0.06);border-radius:10px;">
+                  <p style="font-size:10px;color:#8A9BB0;text-transform:uppercase;letter-spacing:0.05em;">Heart Rate</p>
+                  <p style="font-size:16px;font-weight:700;color:#fff;margin-top:4px;">88<span style="font-size:12px;font-weight:400;color:#8A9BB0;"> bpm</span></p>
+                  <p style="font-size:10px;color:#4A7C59;margin-top:2px;">Normal</p>
+                </div>
+                <div style="padding:10px 12px;background:rgba(255,255,255,0.06);border-radius:10px;">
+                  <p style="font-size:10px;color:#8A9BB0;text-transform:uppercase;letter-spacing:0.05em;">Temperature</p>
+                  <p style="font-size:16px;font-weight:700;color:#fff;margin-top:4px;">37.1<span style="font-size:12px;font-weight:400;color:#8A9BB0;">°C</span></p>
+                  <p style="font-size:10px;color:#4A7C59;margin-top:2px;">Normal</p>
+                </div>
+                <div style="padding:10px 12px;background:rgba(255,255,255,0.06);border-radius:10px;">
+                  <p style="font-size:10px;color:#8A9BB0;text-transform:uppercase;letter-spacing:0.05em;">SpO₂</p>
+                  <p style="font-size:16px;font-weight:700;color:#fff;margin-top:4px;">98<span style="font-size:12px;font-weight:400;color:#8A9BB0;">%</span></p>
+                  <p style="font-size:10px;color:#4A7C59;margin-top:2px;">Normal</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:8px;">
+                <button style="flex:1;padding:10px;background:#4A7C59;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">Open Record</button>
+                <button style="padding:10px 14px;background:rgba(255,255,255,0.08);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='rgba(255,255,255,0.14)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+                  <i data-lucide="pill" style="width:14px;height:14px;"></i> Prescribe
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card" style="padding:20px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;margin-bottom:14px;">Quick Actions</h2>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#E8F2EB;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#4A7C59';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#E8F2EB';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="file-plus" style="width:20px;height:20px;color:#4A7C59;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#4A7C59;text-align:center;line-height:1.3;">New Note</span>
+                </button>
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#FAF0ED;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#E8927C';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#FAF0ED';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="pill" style="width:20px;height:20px;color:#E8927C;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#E8927C;text-align:center;line-height:1.3;">Prescribe</span>
+                </button>
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#FBF6E9;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#C9A84C';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#FBF6E9';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="flask-conical" style="width:20px;height:20px;color:#C9A84C;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#C9A84C;text-align:center;line-height:1.3;">Request Lab</span>
+                </button>
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#EEF2F7;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#0D1117';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#EEF2F7';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="calendar-plus" style="width:20px;height:20px;color:#0D1117;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#0D1117;text-align:center;line-height:1.3;">Referral</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div><!-- /row2 -->
+
+        <!-- ── ROW 3: Patient Table ── -->
+        <div class="fu d3 card" style="margin-bottom:16px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(13,17,23,0.06);">
+            <div>
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">My Patients Today</h2>
+              <p style="color:#8A9BB0;font-size:13px;margin-top:2px;">12 total · 3 completed</p>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button style="font-size:12px;padding:6px 12px;background:#4A7C59;color:#fff;border:none;border-radius:8px;font-weight:500;cursor:pointer;">All</button>
+              <button style="font-size:12px;padding:6px 10px;color:#8A9BB0;background:#EEF2F7;border:none;border-radius:8px;cursor:pointer;">Pending</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.06);">
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 20px;">Patient</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Complaint</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Time</th>
+                  <th style="text-align:left;font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;">Status</th>
+                  <th style="padding:10px 12px;width:100px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);background:rgba(238,242,247,0.3);">
+                  <td style="padding:12px 20px;"><div style="display:flex;align-items:center;gap:10px;"><div class="av" style="background:#EEF2F7;color:#8A9BB0;border-color:#EEF2F7;font-size:10px;">FN</div><div><p style="font-size:14px;font-weight:500;color:#8A9BB0;">Fatima Nwosu</p><p style="font-size:11px;color:#8A9BB0;">P-00318 · 42F</p></div></div></td>
+                  <td style="padding:12px;"><p style="font-size:13px;color:#8A9BB0;">Diabetes check-up</p></td>
+                  <td style="padding:12px;font-size:13px;color:#8A9BB0;white-space:nowrap;">08:00 AM</td>
+                  <td style="padding:12px;"><span class="badge b-completed">Completed</span></td>
+                  <td style="padding:12px;"><button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">View notes</button></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);background:rgba(238,242,247,0.3);">
+                  <td style="padding:12px 20px;"><div style="display:flex;align-items:center;gap:10px;"><div class="av" style="background:#EEF2F7;color:#8A9BB0;border-color:#EEF2F7;font-size:10px;">KU</div><div><p style="font-size:14px;font-weight:500;color:#8A9BB0;">Kunle Adeola</p><p style="font-size:11px;color:#8A9BB0;">P-00201 · 67M</p></div></div></td>
+                  <td style="padding:12px;"><p style="font-size:13px;color:#8A9BB0;">BP review</p></td>
+                  <td style="padding:12px;font-size:13px;color:#8A9BB0;white-space:nowrap;">08:30 AM</td>
+                  <td style="padding:12px;"><span class="badge b-completed">Completed</span></td>
+                  <td style="padding:12px;"><button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">View notes</button></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);background:rgba(232,242,235,0.35);">
+                  <td style="padding:12px 20px;"><div style="display:flex;align-items:center;gap:10px;"><div class="av" style="background:#4A7C59;color:#fff;font-size:10px;border-color:#4A7C59;">CE</div><div><p style="font-size:14px;font-weight:600;color:#0D1117;">Chioma Eze</p><p style="font-size:11px;color:#8A9BB0;">P-00421 · 29F</p></div></div></td>
+                  <td style="padding:12px;"><p style="font-size:13px;color:#0D1117;font-weight:500;">Hypertension follow-up</p></td>
+                  <td style="padding:12px;font-size:13px;font-weight:600;color:#4A7C59;white-space:nowrap;">09:00 AM</td>
+                  <td style="padding:12px;"><span class="badge b-checkin">In Progress</span></td>
+                  <td style="padding:12px;"><button style="font-size:12px;background:#4A7C59;color:#fff;padding:5px 12px;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Open</button></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;"><div style="display:flex;align-items:center;gap:10px;"><div class="av" style="background:#C9A84C;color:#fff;font-size:10px;border-color:#C9A84C;">FA</div><div><p style="font-size:14px;font-weight:500;color:#0D1117;">Femi Adeyemi</p><p style="font-size:11px;color:#8A9BB0;">P-00398 · 54M</p></div></div></td>
+                  <td style="padding:12px;"><p style="font-size:13px;color:#0D1117;">Cardiac follow-up</p></td>
+                  <td style="padding:12px;font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;">09:45 AM</td>
+                  <td style="padding:12px;"><span class="badge b-scheduled">Next Up</span></td>
+                  <td style="padding:12px;"><button style="font-size:12px;color:#0D1117;font-weight:500;background:#EEF2F7;padding:5px 12px;border:none;border-radius:8px;cursor:pointer;">Prepare</button></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(13,17,23,0.05);">
+                  <td style="padding:12px 20px;"><div style="display:flex;align-items:center;gap:10px;"><div class="av" style="background:#E8927C;color:#fff;font-size:10px;border-color:#E8927C;">NN</div><div><p style="font-size:14px;font-weight:500;color:#0D1117;">Ngozi Nnadi</p><p style="font-size:11px;color:#8A9BB0;">P-00312 · 7F</p></div></div></td>
+                  <td style="padding:12px;"><p style="font-size:13px;color:#0D1117;">New patient · General</p></td>
+                  <td style="padding:12px;font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;">10:30 AM</td>
+                  <td style="padding:12px;"><span class="badge b-scheduled">Scheduled</span></td>
+                  <td style="padding:12px;"><button style="font-size:12px;color:#8A9BB0;background:none;border:none;cursor:pointer;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 20px;"><div style="display:flex;align-items:center;gap:10px;"><div class="av" style="background:#8A9BB0;color:#fff;font-size:10px;border-color:#8A9BB0;">BA</div><div><p style="font-size:14px;font-weight:500;color:#0D1117;">Blessing Agu</p><p style="font-size:11px;color:#8A9BB0;">P-00557 · 45M</p></div></div></td>
+                  <td style="padding:12px;"><p style="font-size:13px;color:#0D1117;">Routine check-up</p></td>
+                  <td style="padding:12px;font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;">11:15 AM</td>
+                  <td style="padding:12px;"><span class="badge b-scheduled">Scheduled</span></td>
+                  <td style="padding:12px;"><button style="font-size:12px;color:#8A9BB0;background:none;border:none;cursor:pointer;"><i data-lucide="more-horizontal" style="width:16px;height:16px;"></i></button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:12px 20px;border-top:1px solid rgba(13,17,23,0.06);display:flex;align-items:center;justify-content:space-between;">
+            <p style="font-size:12px;color:#8A9BB0;">Showing 6 of 12 patients</p>
+            <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+              Full list <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── ROW 4: Pending Lab Results + Recent Prescriptions + My Notes ── -->
+        <div class="fu d4" style="display:grid;grid-template-columns:1fr;gap:16px;" id="row4">
+
+          <!-- Pending Lab Results -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Pending Lab Results</h2>
+              <span class="badge b-checkin">5 Awaiting</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FAF0ED;border-radius:10px;border-left:3px solid #E8927C;">
+                <i data-lucide="flask-conical" style="width:16px;height:16px;color:#E8927C;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chioma Eze — FBC</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Full Blood Count · Requested 2h ago</p>
+                </div>
+                <button style="font-size:11px;background:#E8927C;color:#fff;padding:4px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">Review</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FBF6E9;border-radius:10px;border-left:3px solid #C9A84C;">
+                <i data-lucide="flask-conical" style="width:16px;height:16px;color:#C9A84C;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Femi Adeyemi — ECG</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Electrocardiogram · Yesterday</p>
+                </div>
+                <button style="font-size:11px;background:#C9A84C;color:#fff;padding:4px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">Review</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#EEF2F7;border-radius:10px;border-left:3px solid #8A9BB0;">
+                <i data-lucide="flask-conical" style="width:16px;height:16px;color:#8A9BB0;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Fatima Nwosu — HbA1c</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Glycated Haemoglobin · 2 days ago</p>
+                </div>
+                <button style="font-size:11px;color:#4A7C59;background:#E8F2EB;padding:4px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">View</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#EEF2F7;border-radius:10px;border-left:3px solid #8A9BB0;">
+                <i data-lucide="flask-conical" style="width:16px;height:16px;color:#8A9BB0;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ngozi Nnadi — Urinalysis</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Urine culture · 2 days ago</p>
+                </div>
+                <button style="font-size:11px;color:#4A7C59;background:#E8F2EB;padding:4px 10px;border:none;border-radius:6px;font-weight:600;cursor:pointer;flex-shrink:0;">View</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Prescriptions -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Recent Prescriptions</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">All</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:34px;height:34px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="pill" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;">Amlodipine 5mg</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Chioma Eze · Once daily · 30 days</p>
+                </div>
+                <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;"><i data-lucide="printer" style="width:14px;height:14px;"></i></button>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:34px;height:34px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="pill" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;">Metformin 500mg</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Fatima Nwosu · Twice daily · 90 days</p>
+                </div>
+                <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;"><i data-lucide="printer" style="width:14px;height:14px;"></i></button>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:34px;height:34px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="pill" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;">Bisoprolol 2.5mg</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Kunle Adeola · Once daily · 60 days</p>
+                </div>
+                <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;"><i data-lucide="printer" style="width:14px;height:14px;"></i></button>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:34px;height:34px;background:#FBF6E9;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="pill" style="width:15px;height:15px;color:#C9A84C;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;">Amoxicillin 500mg</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Blessing Agu · Thrice daily · 7 days</p>
+                </div>
+                <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;"><i data-lucide="printer" style="width:14px;height:14px;"></i></button>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:34px;height:34px;background:#FAF0ED;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="pill" style="width:15px;height:15px;color:#E8927C;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;">Omeprazole 20mg</p>
+                  <p style="font-size:11px;color:#8A9BB0;">Ngozi Nnadi · Once daily · 14 days</p>
+                </div>
+                <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;"><i data-lucide="printer" style="width:14px;height:14px;"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Doctor Notes / Activity -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">My Activity</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">Full log</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0;">
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="file-pen" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Consultation note saved</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Kunle Adeola · BP review complete</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">08:48 AM · Today</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#FBF6E9;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="pill" style="width:13px;height:13px;color:#C9A84C;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Prescription issued</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Bisoprolol · Kunle Adeola</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">08:45 AM · Today</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#FAF0ED;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="flask-conical" style="width:13px;height:13px;color:#E8927C;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Lab test requested</p>
+                  <p style="font-size:12px;color:#8A9BB0;">FBC · Chioma Eze</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">08:12 AM · Today</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="file-pen" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                </div>
+                <div>
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Consultation note saved</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Fatima Nwosu · Diabetes check-up</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">08:22 AM · Today</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /row4 -->
+
+      </div><!-- /padded-content -->
+    </div><!-- /scroll-area -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ══ BOTTOM NAV (mobile) ══ -->
+<nav id="bottom-nav">
+  <a href="#" class="active">
+    <i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i>
+    <span>Home</span>
+  </a>
+  <a href="#">
+    <i data-lucide="calendar-days" style="width:20px;height:20px;"></i>
+    <span>Schedule</span>
+  </a>
+  <a href="#">
+    <i data-lucide="users" style="width:20px;height:20px;"></i>
+    <span>Patients</span>
+  </a>
+  <a href="#">
+    <i data-lucide="pill" style="width:20px;height:20px;"></i>
+    <span>Prescribe</span>
+  </a>
+  <a href="#">
+    <i data-lucide="flask-conical" style="width:20px;height:20px;"></i>
+    <span>Labs</span>
+  </a>
+</nav>
+
+<script>
+  lucide.createIcons();
+
+  function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('overlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+    document.body.style.overflow = '';
+  }
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 1024) closeSidebar();
+  });
+
+  function applyLayout() {
+    const w = window.innerWidth;
+    const row2 = document.getElementById('row2');
+    const row4 = document.getElementById('row4');
+    const dateSub = document.getElementById('date-sub');
+    const searchWrap = document.getElementById('search-wrap');
+    const mobSearch = document.getElementById('mob-search');
+    const ctaLabel = document.getElementById('cta-label');
+    const swipeHint = document.getElementById('swipe-hint');
+    const padded = document.getElementById('padded-content');
+
+    dateSub.style.display = w >= 640 ? 'block' : 'none';
+    searchWrap.style.display = w >= 768 ? 'flex' : 'none';
+    mobSearch.style.display = w >= 768 ? 'none' : 'flex';
+    ctaLabel.textContent = w >= 480 ? 'Start Consult' : 'Consult';
+    if (swipeHint) swipeHint.style.display = w >= 768 ? 'none' : 'block';
+    padded.style.padding = w >= 768 ? '0 24px 24px' : '0 16px 16px';
+
+    // Row2: timeline + side panel
+    if (row2) row2.style.gridTemplateColumns = w >= 1024 ? '1.4fr 1fr' : '1fr';
+
+    // Row4: 3 cols lg, 2 md, 1 sm
+    if (row4) {
+      if (w >= 1024) row4.style.gridTemplateColumns = '1fr 1fr 1fr';
+      else if (w >= 640) row4.style.gridTemplateColumns = '1fr 1fr';
+      else row4.style.gridTemplateColumns = '1fr';
+    }
+  }
+
+  applyLayout();
+  window.addEventListener('resize', applyLayout);
+</script>
+</body>
+</html>

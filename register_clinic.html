@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Set Up Your Clinic</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #0D1117;
+      --paper:      #F7F4EF;
+      --sage:       #4A7C59;
+      --sage-light: #6BA37A;
+      --sage-dark:  #2F5C3A;
+      --sage-pale:  #E8F2EB;
+      --blush:      #E8927C;
+      --blush-pale: #FAF0ED;
+      --gold:       #C9A84C;
+      --gold-pale:  #FBF6E9;
+      --slate:      #8A9BB0;
+      --border:     rgba(13,17,23,0.1);
+    }
+
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); overflow: hidden; }
+    .wrapper { display: flex; height: 100vh; width: 100vw; }
+
+    /* ══ FORM PANEL ══ */
+    .form-panel {
+      width: 100%; max-width: 540px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      padding: 36px 48px;
+      overflow-y: auto; position: relative; z-index: 2;
+    }
+    .form-panel::-webkit-scrollbar { width: 4px; }
+    .form-panel::-webkit-scrollbar-thumb { background: #C8C4BC; border-radius: 100px; }
+
+    /* ══ LOGO ══ */
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 36px; }
+    .logo-mark { width: 38px; height: 38px; background: linear-gradient(135deg, var(--sage), var(--sage-dark)); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .logo-text { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--ink); line-height: 1; }
+    .logo-sub  { font-size: 11px; color: var(--slate); margin-top: 2px; }
+
+    /* ══ STEP INDICATOR ══ */
+    .steps { display: flex; align-items: center; gap: 0; margin-bottom: 32px; }
+    .step  { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+    .step-num { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .step.done .step-num    { background: var(--sage); color: #fff; }
+    .step.done .step-label  { color: var(--slate); }
+    .step.active .step-num  { background: var(--sage); color: #fff; }
+    .step.active .step-label { color: var(--sage-dark); }
+    .step.pending .step-num { background: #E8E4DC; color: var(--slate); }
+    .step.pending .step-label { color: var(--slate); }
+    .step-label { white-space: nowrap; }
+    .step-line { flex: 1; height: 1.5px; margin: 0 10px; }
+    .step-line.done { background: var(--sage); }
+    .step-line.pending { background: #E8E4DC; }
+
+    /* ══ FORM HEADER ══ */
+    .form-header { margin-bottom: 24px; }
+    .form-header h1 { font-family: 'DM Serif Display', serif; font-size: 30px; line-height: 1.2; color: var(--ink); }
+    .form-header h1 em { color: var(--sage); font-style: italic; }
+    .form-header p { font-size: 14px; color: var(--slate); margin-top: 8px; line-height: 1.6; }
+
+    /* ══ SECTION LABEL ══ */
+    .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate); margin: 20px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    /* ══ FIELDS ══ */
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+    .field-wrap { position: relative; }
+    .field-wrap .field-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--slate); pointer-events: none; width: 16px; height: 16px; }
+    .field-wrap input, .field-wrap select, .field-wrap textarea {
+      width: 100%; padding: 11px 14px 11px 42px;
+      font-size: 14px; font-family: 'DM Sans', sans-serif;
+      background: #fff; border: 1.5px solid var(--border);
+      border-radius: 12px; outline: none; color: var(--ink);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .field-wrap input:focus, .field-wrap select:focus, .field-wrap textarea:focus {
+      border-color: var(--sage); box-shadow: 0 0 0 4px rgba(74,124,89,0.1);
+    }
+    .field-wrap input::placeholder, .field-wrap textarea::placeholder { color: #B0B8C4; }
+    .field-wrap select { cursor: pointer; }
+    .field-wrap textarea { min-height: 80px; resize: vertical; padding-top: 12px; line-height: 1.5; }
+    .field-wrap .select-arrow { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+    /* Fields without left icon */
+    .no-icon input, .no-icon select, .no-icon textarea { padding-left: 14px; }
+
+    /* Field error */
+    .field-error { font-size: 12px; color: #C05C3C; margin-top: 5px; display: none; }
+    .field.error .field-wrap input, .field.error .field-wrap select { border-color: #E8927C; }
+    .field.error .field-error { display: block; }
+
+    /* ══ PLAN CARDS ══ */
+    .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
+    .plan-card {
+      padding: 14px 12px;
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .plan-card:hover { border-color: var(--sage); background: var(--sage-pale); }
+    .plan-card.selected { border-color: var(--sage); background: var(--sage-pale); }
+    .plan-card.popular { position: relative; }
+    .popular-tag {
+      position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+      background: var(--sage); color: #fff; font-size: 9px; font-weight: 700;
+      padding: 2px 8px; border-radius: 100px; white-space: nowrap; letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .plan-name  { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+    .plan-price { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--sage-dark); margin-bottom: 3px; }
+    .plan-price span { font-size: 11px; font-family: 'DM Sans', sans-serif; color: var(--slate); font-weight: 400; }
+    .plan-desc  { font-size: 11px; color: var(--slate); line-height: 1.4; }
+    .plan-card.selected .plan-name  { color: var(--sage-dark); }
+    .plan-card.selected .plan-price { color: var(--sage); }
+
+    /* ══ SUBMIT ══ */
+    .btn-submit {
+      width: 100%; padding: 14px; margin-top: 6px;
+      background: var(--sage); color: #fff;
+      font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+      border: none; border-radius: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .btn-submit:hover { background: var(--sage-dark); box-shadow: 0 6px 20px rgba(47,92,58,0.28); transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+
+    /* Back link */
+    .back-link { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--slate); text-decoration: none; margin-bottom: 20px; width: fit-content; transition: color 0.15s; }
+    .back-link:hover { color: var(--sage); }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .logo        { animation: fadeUp 0.4s ease 0.05s both; }
+    .steps       { animation: fadeUp 0.4s ease 0.08s both; }
+    .back-link   { animation: fadeUp 0.4s ease 0.10s both; }
+    .form-header { animation: fadeUp 0.4s ease 0.12s both; }
+    .anim-1      { animation: fadeUp 0.4s ease 0.16s both; }
+    .anim-2      { animation: fadeUp 0.4s ease 0.20s both; }
+    .anim-3      { animation: fadeUp 0.4s ease 0.24s both; }
+    .anim-4      { animation: fadeUp 0.4s ease 0.28s both; }
+    .anim-5      { animation: fadeUp 0.4s ease 0.32s both; }
+    .anim-6      { animation: fadeUp 0.4s ease 0.36s both; }
+    .anim-7      { animation: fadeUp 0.4s ease 0.40s both; }
+
+    /* ══ VISUAL PANEL ══ */
+    .visual-panel {
+      flex: 1;
+      background: linear-gradient(145deg, #0D1117 0%, #102015 40%, #1a3322 75%, #2F5C3A 100%);
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 52px;
+    }
+    .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.18; }
+    .blob-1 { width: 400px; height: 400px; background: #4A7C59; top: -100px; right: -80px; }
+    .blob-2 { width: 280px; height: 280px; background: #C9A84C; bottom: 100px; right: 60px; opacity: 0.12; }
+    .blob-3 { width: 200px; height: 200px; background: #E8927C; top: 45%; left: 8%; opacity: 0.10; }
+    .grid-overlay {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(74,124,89,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(74,124,89,0.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Clinic preview card */
+    .preview-wrap { position: absolute; top: 52px; left: 52px; right: 52px; }
+    .preview-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); margin-bottom: 14px; }
+    .preview-card {
+      background: rgba(255,255,255,0.06); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+      padding: 20px;
+      opacity: 0; transform: translateY(14px);
+      animation: floatIn 0.5s ease 0.2s forwards;
+    }
+    @keyframes floatIn { to { opacity: 1; transform: translateY(0); } }
+    .preview-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .preview-logo { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, var(--sage), var(--sage-dark)); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .preview-name { font-family: 'DM Serif Display', serif; font-size: 18px; color: rgba(255,255,255,0.9); line-height: 1.2; }
+    .preview-sub  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+    .preview-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .preview-chip { font-size: 11px; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+
+    /* Feature list */
+    .feature-list { position: absolute; bottom: 52px; left: 52px; right: 52px; display: flex; flex-direction: column; gap: 0; }
+
+    /* bottom copy */
+    .visual-copy { position: relative; z-index: 1; }
+    .visual-copy h2 { font-family: 'DM Serif Display', serif; font-size: clamp(24px, 2.8vw, 40px); color: #fff; line-height: 1.25; margin-bottom: 14px; }
+    .visual-copy h2 em { color: var(--sage-light); font-style: italic; }
+    .visual-copy p { font-size: 14px; color: rgba(255,255,255,0.48); max-width: 440px; line-height: 1.7; margin-bottom: 28px; }
+
+    /* Feature rows */
+    .feat-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+      opacity: 0; transform: translateY(10px);
+      animation: floatIn 0.45s ease forwards;
+    }
+    .feat-row:last-child { border-bottom: none; }
+    .feat-row:nth-child(1) { animation-delay: 0.2s; }
+    .feat-row:nth-child(2) { animation-delay: 0.32s; }
+    .feat-row:nth-child(3) { animation-delay: 0.44s; }
+    .feat-row:nth-child(4) { animation-delay: 0.56s; }
+    .feat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .feat-row h4 { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85); margin-bottom: 2px; }
+    .feat-row p  { font-size: 12px; color: rgba(255,255,255,0.38); line-height: 1.4; }
+
+    @media (max-width: 900px) { .visual-panel { display: none; } .form-panel { max-width: 100%; padding: 28px 20px; } }
+    @media (max-width: 440px)  { .form-panel { padding: 20px 16px; } .field-row { grid-template-columns: 1fr; } .plan-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ══ FORM PANEL ══ -->
+  <div class="form-panel">
+
+    <!-- Logo -->
+    <div class="logo">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">MediCore</div>
+        <div class="logo-sub">Healthcare Management Platform</div>
+      </div>
+    </div>
+
+    <!-- Step indicator -->
+    <div class="steps">
+      <div class="step done">
+        <div class="step-num">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <span class="step-label">Your Account</span>
+      </div>
+      <div class="step-line done"></div>
+      <div class="step active">
+        <div class="step-num">2</div>
+        <span class="step-label">Clinic Setup</span>
+      </div>
+    </div>
+
+    <!-- Back -->
+    <a href="register.html" class="back-link">
+      <i data-lucide="arrow-left" style="width:15px;height:15px;"></i>
+      Back to account setup
+    </a>
+
+    <!-- Header -->
+    <div class="form-header">
+      <h1>Set up your <em>clinic</em></h1>
+      <p>Tell us about your clinic so we can set up your workspace. You can always edit this later.</p>
+    </div>
+
+    <form id="clinic-form" onsubmit="handleSubmit(event)" autocomplete="off">
+
+      <!-- ── Clinic Info ── -->
+      <div class="section-label anim-1">Clinic Information</div>
+
+      <!-- Clinic name -->
+      <div class="field anim-1" id="field-cname">
+        <label for="cname">Clinic name <span style="color:var(--blush);">*</span></label>
+        <div class="field-wrap">
+          <i data-lucide="building-2" class="field-icon"></i>
+          <input type="text" id="cname" placeholder="Grace Health Clinic" oninput="updatePreview()"/>
+        </div>
+        <p class="field-error">Clinic name is required.</p>
+      </div>
+
+      <!-- Type + Specialty -->
+      <div class="field-row anim-2">
+        <div class="field" id="field-type">
+          <label for="ctype">Clinic type <span style="color:var(--blush);">*</span></label>
+          <div class="field-wrap">
+            <i data-lucide="stethoscope" class="field-icon"></i>
+            <select id="ctype" onchange="updatePreview()">
+              <option value="" disabled selected>Select type</option>
+              <option>General Practice</option>
+              <option>Specialist Clinic</option>
+              <option>Hospital</option>
+              <option>Dental Clinic</option>
+              <option>Eye Clinic</option>
+              <option>Maternity / Obs &amp; Gynae</option>
+              <option>Paediatrics</option>
+              <option>Physiotherapy</option>
+              <option>Diagnostic Centre</option>
+              <option>Other</option>
+            </select>
+            <i data-lucide="chevron-down" class="select-arrow" style="width:15px;height:15px;color:var(--slate);"></i>
+          </div>
+          <p class="field-error">Select a clinic type.</p>
+        </div>
+        <div class="field" id="field-size">
+          <label for="csize">Team size</label>
+          <div class="field-wrap">
+            <i data-lucide="users" class="field-icon"></i>
+            <select id="csize">
+              <option value="" disabled selected>Select size</option>
+              <option>1–5 staff</option>
+              <option>6–20 staff</option>
+              <option>21–50 staff</option>
+              <option>50+ staff</option>
+            </select>
+            <i data-lucide="chevron-down" class="select-arrow" style="width:15px;height:15px;color:var(--slate);"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Location ── -->
+      <div class="section-label anim-3">Location</div>
+
+      <div class="field-row anim-3">
+        <div class="field" id="field-city">
+          <label for="city">City <span style="color:var(--blush);">*</span></label>
+          <div class="field-wrap">
+            <i data-lucide="map-pin" class="field-icon"></i>
+            <input type="text" id="city" placeholder="Lagos" oninput="updatePreview()"/>
+          </div>
+          <p class="field-error">Enter your city.</p>
+        </div>
+        <div class="field" id="field-state">
+          <label for="cstate">State <span style="color:var(--blush);">*</span></label>
+          <div class="field-wrap">
+            <i data-lucide="map" class="field-icon"></i>
+            <select id="cstate" onchange="updatePreview()">
+              <option value="" disabled selected>Select state</option>
+              <option>Abia</option><option>Adamawa</option><option>Akwa Ibom</option>
+              <option>Anambra</option><option>Bauchi</option><option>Bayelsa</option>
+              <option>Benue</option><option>Borno</option><option>Cross River</option>
+              <option>Delta</option><option>Ebonyi</option><option>Edo</option>
+              <option>Ekiti</option><option>Enugu</option><option>FCT – Abuja</option>
+              <option>Gombe</option><option>Imo</option><option>Jigawa</option>
+              <option>Kaduna</option><option>Kano</option><option>Katsina</option>
+              <option>Kebbi</option><option>Kogi</option><option>Kwara</option>
+              <option>Lagos</option><option>Nasarawa</option><option>Niger</option>
+              <option>Ogun</option><option>Ondo</option><option>Osun</option>
+              <option>Oyo</option><option>Plateau</option><option>Rivers</option>
+              <option>Sokoto</option><option>Taraba</option><option>Yobe</option>
+              <option>Zamfara</option>
+            </select>
+            <i data-lucide="chevron-down" class="select-arrow" style="width:15px;height:15px;color:var(--slate);"></i>
+          </div>
+          <p class="field-error">Select a state.</p>
+        </div>
+      </div>
+
+      <div class="field anim-3" id="field-address">
+        <label for="address">Street address</label>
+        <div class="field-wrap">
+          <i data-lucide="navigation" class="field-icon"></i>
+          <input type="text" id="address" placeholder="12 Adetokunbo Ademola Street, Victoria Island"/>
+        </div>
+      </div>
+
+      <!-- ── Contact ── -->
+      <div class="section-label anim-4">Contact</div>
+
+      <div class="field-row anim-4">
+        <div class="field" id="field-phone">
+          <label for="phone">Phone number <span style="color:var(--blush);">*</span></label>
+          <div class="field-wrap">
+            <i data-lucide="phone" class="field-icon"></i>
+            <input type="tel" id="phone" placeholder="0801 234 5678"/>
+          </div>
+          <p class="field-error">Enter a phone number.</p>
+        </div>
+        <div class="field">
+          <label for="website">Website <span style="font-size:11px;color:var(--slate);font-weight:400;">(optional)</span></label>
+          <div class="field-wrap">
+            <i data-lucide="globe" class="field-icon"></i>
+            <input type="url" id="website" placeholder="https://yourclinic.ng"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Plan ── -->
+      <div class="section-label anim-5">Choose a plan</div>
+      <div class="plan-grid anim-5">
+
+        <div class="plan-card" data-plan="starter" onclick="selectPlan(this)">
+          <div class="plan-name">Starter</div>
+          <div class="plan-price">₦120k<span>/mo</span></div>
+          <div class="plan-desc">Up to 10 staff · 1 branch</div>
+        </div>
+
+        <div class="plan-card popular selected" data-plan="pro" onclick="selectPlan(this)">
+          <div class="popular-tag">Most popular</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price">₦450k<span>/mo</span></div>
+          <div class="plan-desc">Up to 50 staff · 3 branches</div>
+        </div>
+
+        <div class="plan-card" data-plan="enterprise" onclick="selectPlan(this)">
+          <div class="plan-name">Enterprise</div>
+          <div class="plan-price">Custom</div>
+          <div class="plan-desc">Unlimited staff &amp; branches</div>
+        </div>
+
+      </div>
+      <p style="font-size:12px;color:var(--slate);margin:8px 0 4px;" class="anim-5">
+        All plans include a <strong style="color:var(--sage);">14-day free trial</strong>. No credit card required.
+      </p>
+
+      <!-- Submit -->
+      <button type="submit" class="btn-submit anim-6" id="submit-btn">
+        <span id="btn-text">Launch my clinic</span>
+        <svg id="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <div class="spinner" id="spinner"></div>
+      </button>
+
+    </form>
+
+  </div><!-- /form-panel -->
+
+  <!-- ══ VISUAL PANEL ══ -->
+  <div class="visual-panel">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="grid-overlay"></div>
+
+    <!-- Live clinic preview -->
+    <div class="preview-wrap">
+      <p class="preview-label">Your clinic preview</p>
+      <div class="preview-card">
+        <div class="preview-top">
+          <div class="preview-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div>
+            <div class="preview-name" id="prev-name">Your Clinic Name</div>
+            <div class="preview-sub" id="prev-sub">City, State · Nigeria</div>
+          </div>
+        </div>
+        <div class="preview-chips" id="prev-chips">
+          <span class="preview-chip" id="prev-type">General Practice</span>
+          <span class="preview-chip" id="prev-plan">Pro Plan</span>
+          <span class="preview-chip">14-day trial</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- What you get -->
+    <div class="visual-copy">
+      <h2>Everything your<br>clinic needs, <em>ready</em>.</h2>
+      <p>Your MediCore workspace comes preloaded with everything from day one.</p>
+
+      <div style="display:flex;flex-direction:column;gap:0;">
+        <div class="feat-row">
+          <div class="feat-icon" style="background:rgba(74,124,89,0.22);">
+            <i data-lucide="calendar-days" style="width:16px;height:16px;color:#6BA37A;"></i>
+          </div>
+          <div>
+            <h4>Appointment management</h4>
+            <p>Book, reschedule, and track all appointments across your team.</p>
+          </div>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon" style="background:rgba(201,168,76,0.2);">
+            <i data-lucide="file-heart" style="width:16px;height:16px;color:#C9A84C;"></i>
+          </div>
+          <div>
+            <h4>Digital patient records</h4>
+            <p>Secure, searchable patient histories, notes, and documents.</p>
+          </div>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon" style="background:rgba(232,146,124,0.2);">
+            <i data-lucide="receipt" style="width:16px;height:16px;color:#E8927C;"></i>
+          </div>
+          <div>
+            <h4>Billing & invoicing</h4>
+            <p>Generate invoices, track payments, and manage outstanding bills.</p>
+          </div>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon" style="background:rgba(74,124,89,0.22);">
+            <i data-lucide="flask-conical" style="width:16px;height:16px;color:#6BA37A;"></i>
+          </div>
+          <div>
+            <h4>Lab requests & results</h4>
+            <p>Doctors request tests; results flow directly to the patient record.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /visual-panel -->
+
+</div>
+
+<script>
+  lucide.createIcons();
+
+  /* ── PLAN SELECTION ── */
+  function selectPlan(card) {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    const plan = card.dataset.plan;
+    const labels = { starter: 'Starter Plan', pro: 'Pro Plan', enterprise: 'Enterprise Plan' };
+    document.getElementById('prev-plan').textContent = labels[plan] || 'Pro Plan';
+  }
+
+  /* ── LIVE PREVIEW ── */
+  function updatePreview() {
+    const name  = document.getElementById('cname').value.trim();
+    const city  = document.getElementById('city').value.trim();
+    const state = document.getElementById('cstate').value;
+    const type  = document.getElementById('ctype').value;
+
+    document.getElementById('prev-name').textContent = name || 'Your Clinic Name';
+    document.getElementById('prev-name').style.color = name ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.35)';
+
+    const locParts = [city, state].filter(Boolean);
+    document.getElementById('prev-sub').textContent = locParts.length ? locParts.join(', ') + ' · Nigeria' : 'City, State · Nigeria';
+    document.getElementById('prev-type').textContent = type || 'General Practice';
+  }
+
+  /* ── FORM SUBMIT ── */
+  function handleSubmit(e) {
+    e.preventDefault();
+    let valid = true;
+    const required = [
+      { id: 'field-cname',   val: document.getElementById('cname').value.trim() },
+      { id: 'field-type',    val: document.getElementById('ctype').value },
+      { id: 'field-city',    val: document.getElementById('city').value.trim() },
+      { id: 'field-state',   val: document.getElementById('cstate').value },
+      { id: 'field-phone',   val: document.getElementById('phone').value.trim() },
+    ];
+    required.forEach(({ id, val }) => {
+      document.getElementById(id).classList[!val ? 'add' : 'remove']('error');
+      if (!val) valid = false;
+    });
+    if (!valid) return;
+
+    const btn = document.getElementById('submit-btn');
+    const txt = document.getElementById('btn-text');
+    const arr = document.getElementById('btn-arrow');
+    const sp  = document.getElementById('spinner');
+    btn.disabled = true; btn.style.background = 'var(--sage-dark)';
+    txt.textContent = 'Setting up your clinic…'; arr.style.display = 'none'; sp.style.display = 'block';
+
+    setTimeout(() => {
+      txt.textContent = '✓ Clinic created — taking you to your dashboard…';
+      sp.style.display = 'none';
+      // setTimeout(() => { window.location.href = 'clinic-dashboard.html'; }, 800);
+    }, 1800);
+  }
+
+  /* ── Clear errors on input ── */
+  ['cname','city','phone'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      const field = document.getElementById('field-' + id) || document.getElementById('field-c' + id);
+      field?.classList.remove('error');
+    });
+  });
+  document.getElementById('cstate')?.addEventListener('change', () => document.getElementById('field-state')?.classList.remove('error'));
+  document.getElementById('ctype')?.addEventListener('change', () => document.getElementById('field-type')?.classList.remove('error'));
+</script>
+</body>
+</html>

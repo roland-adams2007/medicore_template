@@ -1,0 +1,3612 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediCore – Clinic Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              display: ['"DM Serif Display"', "serif"],
+              body: ['"DM Sans"', "sans-serif"],
+            },
+            colors: {
+              ink: "#0D1117",
+              paper: "#F7F4EF",
+              sage: "#4A7C59",
+              "sage-light": "#6BA37A",
+              "sage-dark": "#2F5C3A",
+              "sage-pale": "#E8F2EB",
+              blush: "#E8927C",
+              "blush-pale": "#FAF0ED",
+              slate: "#8A9BB0",
+              "slate-light": "#EEF2F7",
+              gold: "#C9A84C",
+              "gold-pale": "#FBF6E9",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      * {
+        font-family: "DM Sans", sans-serif;
+        box-sizing: border-box;
+      }
+      .font-display {
+        font-family: "DM Serif Display", serif;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: #f7f4ef;
+      }
+
+      /* ══ LAYOUT ══ */
+      #app {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* ══ SIDEBAR ══ */
+      #sidebar {
+        width: 260px;
+        background: #0d1117;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        height: 100vh;
+        overflow-y: auto;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 50;
+      }
+
+      /* Mobile: off-canvas */
+      @media (max-width: 1023px) {
+        #sidebar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          transform: translateX(-100%);
+        }
+        #sidebar.open {
+          transform: translateX(0);
+          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+        }
+      }
+
+      /* ══ OVERLAY ══ */
+      #overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 17, 23, 0.5);
+        backdrop-filter: blur(2px);
+        z-index: 40;
+      }
+      #overlay.show {
+        display: block;
+      }
+
+      /* ══ MAIN ══ */
+      #main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      #scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-bottom: 72px; /* room for bottom nav on mobile */
+      }
+      @media (min-width: 1024px) {
+        #scroll-area {
+          padding-bottom: 24px;
+        }
+      }
+
+      /* ══ NAV ITEMS ══ */
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        color: #8a9bb0;
+        text-decoration: none;
+        font-size: 14px;
+        transition:
+          background 0.15s,
+          color 0.15s;
+        border-left: 3px solid transparent;
+      }
+      .nav-item:hover {
+        background: rgba(74, 124, 89, 0.15);
+        color: #fff;
+      }
+      .nav-item.active {
+        background: rgba(74, 124, 89, 0.22);
+        color: #fff;
+        border-left-color: #4a7c59;
+      }
+
+      /* ══ CARDS ══ */
+      .card {
+        background: #fff;
+        border: 1px solid #e8e4dc;
+        border-radius: 16px;
+      }
+      .card-sage {
+        background: #4a7c59;
+        border-radius: 16px;
+      }
+      .card-blush {
+        background: #e8927c;
+        border-radius: 16px;
+      }
+
+      /* ══ STAT SCROLL ROW ══ */
+      .stat-row {
+        display: flex;
+        gap: 14px;
+        overflow-x: auto;
+        padding: 0 16px 4px;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+      }
+      .stat-row::-webkit-scrollbar {
+        display: none;
+      }
+      .stat-snap {
+        scroll-snap-align: start;
+        flex: 0 0 75vw;
+        max-width: 300px;
+      }
+      @media (min-width: 640px) {
+        .stat-snap {
+          flex: 0 0 48%;
+        }
+      }
+      @media (min-width: 768px) {
+        .stat-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          overflow: visible;
+          padding: 0;
+        }
+        .stat-snap {
+          flex: none;
+          max-width: none;
+        }
+      }
+
+      /* ══ BADGES ══ */
+      .badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 100px;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+      .b-scheduled {
+        background: #e8f2eb;
+        color: #2f5c3a;
+      }
+      .b-checkin {
+        background: #fbf6e9;
+        color: #8b6a1a;
+      }
+      .b-completed {
+        background: #eef2f7;
+        color: #4a6580;
+      }
+      .b-cancelled {
+        background: #faf0ed;
+        color: #c05c3c;
+      }
+      .b-noshow {
+        background: #f5f0f8;
+        color: #6a3d85;
+      }
+
+      /* ══ AVATAR ══ */
+      .av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      /* ══ PROGRESS ══ */
+      .prog {
+        height: 6px;
+        background: #e8e4dc;
+        border-radius: 100px;
+        overflow: hidden;
+      }
+      .prog-fill {
+        height: 100%;
+        border-radius: 100px;
+      }
+
+      /* ══ CHART BAR ══ */
+      .cbar {
+        background: #e8f2eb;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        align-items: flex-end;
+      }
+      .cbar-fill {
+        background: #4a7c59;
+        border-radius: 8px 8px 0 0;
+        width: 100%;
+      }
+
+      /* ══ SCROLLBARS ══ */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #c8c4bc;
+        border-radius: 100px;
+      }
+
+      /* ══ ANIMATIONS ══ */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .fu {
+        animation: fadeUp 0.4s ease forwards;
+      }
+      .d1 {
+        animation-delay: 0.04s;
+        opacity: 0;
+      }
+      .d2 {
+        animation-delay: 0.08s;
+        opacity: 0;
+      }
+      .d3 {
+        animation-delay: 0.12s;
+        opacity: 0;
+      }
+      .d4 {
+        animation-delay: 0.16s;
+        opacity: 0;
+      }
+
+      @keyframes pdot {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(1.5);
+        }
+      }
+      .pdot {
+        animation: pdot 2s infinite;
+      }
+
+      /* ══ BOTTOM NAV (mobile) ══ */
+      #bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #0d1117;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        z-index: 45;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      @media (min-width: 1024px) {
+        #bottom-nav {
+          display: none;
+        }
+      }
+      #bottom-nav a {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 10px 4px 8px;
+        color: #8a9bb0;
+        font-size: 10px;
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      #bottom-nav a.active,
+      #bottom-nav a:hover {
+        color: #4a7c59;
+      }
+
+      /* ══ TABLE WRAP ══ */
+      .tbl-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .tbl-wrap table {
+        min-width: 520px;
+      }
+
+      /* Hide hamburger on desktop */
+      @media (min-width: 1024px) {
+        #ham-btn {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- ══ OVERLAY ══ -->
+      <div id="overlay" onclick="closeSidebar()"></div>
+
+      <!-- ══════════════ SIDEBAR ══════════════ -->
+      <aside id="sidebar">
+        <!-- Logo -->
+        <div
+          style="
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 10px">
+            <div
+              style="
+                width: 36px;
+                height: 36px;
+                background: #4a7c59;
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+              "
+            >
+              <i
+                data-lucide="activity"
+                style="width: 18px; height: 18px; color: #fff"
+              ></i>
+            </div>
+            <div>
+              <p
+                style="
+                  font-family: &quot;DM Serif Display&quot;, serif;
+                  color: #fff;
+                  font-size: 18px;
+                  line-height: 1;
+                "
+              >
+                MediCore
+              </p>
+              <p style="color: #8a9bb0; font-size: 11px; margin-top: 2px">
+                Clinic OS
+              </p>
+            </div>
+          </div>
+          <button
+            onclick="closeSidebar()"
+            id="close-btn"
+            class="lg:hidden"
+            style="
+              width: 32px;
+              height: 32px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #8a9bb0;
+              background: rgba(255, 255, 255, 0.06);
+              border: none;
+              border-radius: 8px;
+              cursor: pointer;
+            "
+          >
+            <i data-lucide="x" style="width: 16px; height: 16px"></i>
+          </button>
+        </div>
+
+        <!-- Clinic selector -->
+        <div
+          style="
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          "
+        >
+          <button
+            style="
+              width: 100%;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 10px 12px;
+              background: rgba(255, 255, 255, 0.05);
+              border: none;
+              border-radius: 12px;
+              cursor: pointer;
+              text-align: left;
+            "
+          >
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                background: #6ba37a;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #fff;
+                font-size: 11px;
+                font-weight: 700;
+                flex-shrink: 0;
+              "
+            >
+              GH
+            </div>
+            <div style="flex: 1; min-width: 0">
+              <p
+                style="
+                  color: #fff;
+                  font-size: 13px;
+                  font-weight: 500;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                "
+              >
+                Grace Health Clinic
+              </p>
+              <p style="color: #8a9bb0; font-size: 11px">Main Branch</p>
+            </div>
+            <i
+              data-lucide="chevrons-up-down"
+              style="width: 15px; height: 15px; color: #8a9bb0; flex-shrink: 0"
+            ></i>
+          </button>
+        </div>
+
+        <!-- Nav -->
+        <nav
+          style="
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          "
+        >
+          <p
+            style="
+              font-size: 10px;
+              font-weight: 600;
+              color: rgba(138, 155, 176, 0.6);
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+              padding: 0 12px 8px;
+            "
+          >
+            Main
+          </p>
+          <a href="#" class="nav-item active"
+            ><i
+              data-lucide="layout-dashboard"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Dashboard</a
+          >
+          <a href="#" class="nav-item" style="justify-content: flex-start">
+            <i
+              data-lucide="calendar-days"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i>
+            <span style="flex: 1">Appointments</span>
+            <span
+              style="
+                font-size: 11px;
+                background: #4a7c59;
+                color: #fff;
+                padding: 2px 8px;
+                border-radius: 20px;
+              "
+              >14</span
+            >
+          </a>
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="users"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Patients</a
+          >
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="stethoscope"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Consultations</a
+          >
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="user-round-cog"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Staff</a
+          >
+
+          <p
+            style="
+              font-size: 10px;
+              font-weight: 600;
+              color: rgba(138, 155, 176, 0.6);
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+              padding: 16px 12px 8px;
+            "
+          >
+            Finance
+          </p>
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="receipt"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Billing & Invoices</a
+          >
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="bar-chart-2"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Reports</a
+          >
+
+          <p
+            style="
+              font-size: 10px;
+              font-weight: 600;
+              color: rgba(138, 155, 176, 0.6);
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+              padding: 16px 12px 8px;
+            "
+          >
+            Operations
+          </p>
+          <a href="#" class="nav-item" style="justify-content: flex-start">
+            <i
+              data-lucide="pill"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i>
+            <span style="flex: 1">Pharmacy</span>
+            <span
+              class="pdot"
+              style="
+                width: 8px;
+                height: 8px;
+                background: #e8927c;
+                border-radius: 50%;
+                flex-shrink: 0;
+              "
+            ></span>
+          </a>
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="package"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Inventory</a
+          >
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="shield-check"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Audit Log</a
+          >
+          <a href="#" class="nav-item"
+            ><i
+              data-lucide="settings"
+              style="width: 17px; height: 17px; flex-shrink: 0"
+            ></i
+            >Settings</a
+          >
+        </nav>
+
+        <!-- User -->
+        <div
+          style="
+            padding: 14px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          "
+        >
+          <div
+            class="av"
+            style="background: #4a7c59; color: #fff; font-size: 11px"
+          >
+            AD
+          </div>
+          <div style="flex: 1; min-width: 0">
+            <p
+              style="
+                color: #fff;
+                font-size: 13px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              "
+            >
+              Dr. Adaeze Obi
+            </p>
+            <p style="color: #8a9bb0; font-size: 11px">Clinic Admin</p>
+          </div>
+          <button
+            style="
+              background: none;
+              border: none;
+              color: #8a9bb0;
+              cursor: pointer;
+              padding: 4px;
+            "
+            onmouseover="this.style.color = '#fff'"
+            onmouseout="this.style.color = '#8A9BB0'"
+          >
+            <i data-lucide="log-out" style="width: 16px; height: 16px"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ══════════════ MAIN ══════════════ -->
+      <div id="main">
+        <!-- TOP BAR -->
+        <header
+          style="
+            background: rgba(247, 244, 239, 0.95);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(13, 17, 23, 0.1);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            flex-shrink: 0;
+          "
+        >
+          <!-- Hamburger -->
+          <button
+            id="ham-btn"
+            onclick="openSidebar()"
+            style="
+              width: 38px;
+              height: 38px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #fff;
+              border: 1px solid rgba(13, 17, 23, 0.1);
+              border-radius: 10px;
+              cursor: pointer;
+              flex-shrink: 0;
+            "
+          >
+            <i
+              data-lucide="menu"
+              style="width: 17px; height: 17px; color: #0d1117"
+            ></i>
+          </button>
+
+          <div style="flex: 1; min-width: 0">
+            <h1
+              style="
+                font-family: &quot;DM Serif Display&quot;, serif;
+                color: #0d1117;
+                font-size: clamp(16px, 3vw, 22px);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              "
+            >
+              Good morning, Adaeze
+              <span style="color: #4a7c59; font-style: italic">✦</span>
+            </h1>
+            <p
+              style="color: #8a9bb0; font-size: 12px; display: none"
+              id="date-sub"
+            >
+              Thursday, 5 March 2026 · Week 10
+            </p>
+          </div>
+
+          <div
+            style="display: flex; align-items: center; gap: 8px; flex-shrink: 0"
+          >
+            <!-- Search — hidden on small screens -->
+            <div id="search-wrap" style="position: relative; display: none">
+              <i
+                data-lucide="search"
+                style="
+                  position: absolute;
+                  left: 10px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  width: 15px;
+                  height: 15px;
+                  color: #8a9bb0;
+                "
+              ></i>
+              <input
+                type="text"
+                placeholder="Search patients…"
+                style="
+                  padding: 8px 14px 8px 32px;
+                  font-size: 13px;
+                  background: #fff;
+                  border: 1px solid rgba(13, 17, 23, 0.1);
+                  border-radius: 10px;
+                  outline: none;
+                  width: 200px;
+                  font-family: &quot;DM Sans&quot;, sans-serif;
+                "
+              />
+            </div>
+            <!-- Mobile search icon -->
+            <button
+              id="mob-search"
+              style="
+                width: 38px;
+                height: 38px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #fff;
+                border: 1px solid rgba(13, 17, 23, 0.1);
+                border-radius: 10px;
+                cursor: pointer;
+              "
+            >
+              <i
+                data-lucide="search"
+                style="width: 17px; height: 17px; color: #0d1117"
+              ></i>
+            </button>
+            <!-- Bell -->
+            <button
+              style="
+                position: relative;
+                width: 38px;
+                height: 38px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #fff;
+                border: 1px solid rgba(13, 17, 23, 0.1);
+                border-radius: 10px;
+                cursor: pointer;
+              "
+            >
+              <i
+                data-lucide="bell"
+                style="width: 17px; height: 17px; color: #0d1117"
+              ></i>
+              <span
+                style="
+                  position: absolute;
+                  top: 8px;
+                  right: 8px;
+                  width: 7px;
+                  height: 7px;
+                  background: #e8927c;
+                  border-radius: 50%;
+                "
+              ></span>
+            </button>
+            <!-- New Appt -->
+            <button
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 14px;
+                background: #4a7c59;
+                color: #fff;
+                font-size: 13px;
+                font-weight: 500;
+                border: none;
+                border-radius: 10px;
+                cursor: pointer;
+                white-space: nowrap;
+              "
+              onmouseover="this.style.background = '#2F5C3A'"
+              onmouseout="this.style.background = '#4A7C59'"
+            >
+              <i data-lucide="plus" style="width: 15px; height: 15px"></i>
+              <span id="appt-label">New Appt</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- ══ SCROLL AREA ══ -->
+        <div id="scroll-area">
+          <!-- STAT CARDS -->
+          <div class="fu d1" style="padding: 20px 0 6px">
+            <div class="stat-row">
+              <div class="stat-snap card-sage" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div>
+                    <p
+                      style="
+                        color: rgba(255, 255, 255, 0.7);
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Today's Appointments
+                    </p>
+                    <p
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #fff;
+                        font-size: 38px;
+                        margin-top: 6px;
+                        line-height: 1;
+                      "
+                    >
+                      47
+                    </p>
+                    <p
+                      style="
+                        color: rgba(255, 255, 255, 0.55);
+                        font-size: 12px;
+                        margin-top: 4px;
+                      "
+                    >
+                      ↑ 8 more than yesterday
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      width: 40px;
+                      height: 40px;
+                      background: rgba(255, 255, 255, 0.15);
+                      border-radius: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i
+                      data-lucide="calendar-check"
+                      style="width: 20px; height: 20px; color: #fff"
+                    ></i>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 14px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <span
+                    style="
+                      font-size: 12px;
+                      color: rgba(255, 255, 255, 0.8);
+                      background: rgba(255, 255, 255, 0.18);
+                      padding: 4px 10px;
+                      border-radius: 8px;
+                    "
+                    >32 Scheduled</span
+                  >
+                  <span
+                    style="
+                      font-size: 12px;
+                      color: rgba(255, 255, 255, 0.8);
+                      background: rgba(255, 255, 255, 0.18);
+                      padding: 4px 10px;
+                      border-radius: 8px;
+                    "
+                    >15 Walk-in</span
+                  >
+                </div>
+              </div>
+
+              <div class="stat-snap card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div>
+                    <p
+                      style="
+                        color: #8a9bb0;
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Total Patients
+                    </p>
+                    <p
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #0d1117;
+                        font-size: 38px;
+                        margin-top: 6px;
+                        line-height: 1;
+                      "
+                    >
+                      3,841
+                    </p>
+                    <p style="color: #4a7c59; font-size: 12px; margin-top: 4px">
+                      ↑ 12 new this week
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      width: 40px;
+                      height: 40px;
+                      background: #e8f2eb;
+                      border-radius: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i
+                      data-lucide="users"
+                      style="width: 20px; height: 20px; color: #4a7c59"
+                    ></i>
+                  </div>
+                </div>
+                <div class="prog" style="margin-top: 16px">
+                  <div
+                    class="prog-fill"
+                    style="width: 72%; background: #4a7c59"
+                  ></div>
+                </div>
+                <p style="color: #8a9bb0; font-size: 12px; margin-top: 6px">
+                  72% capacity utilisation
+                </p>
+              </div>
+
+              <div class="stat-snap card-blush" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div>
+                    <p
+                      style="
+                        color: rgba(255, 255, 255, 0.7);
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Today's Revenue
+                    </p>
+                    <p
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #fff;
+                        font-size: 38px;
+                        margin-top: 6px;
+                        line-height: 1;
+                      "
+                    >
+                      ₦284k
+                    </p>
+                    <p
+                      style="
+                        color: rgba(255, 255, 255, 0.55);
+                        font-size: 12px;
+                        margin-top: 4px;
+                      "
+                    >
+                      ↑ 18% vs last Thursday
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      width: 40px;
+                      height: 40px;
+                      background: rgba(255, 255, 255, 0.2);
+                      border-radius: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i
+                      data-lucide="banknote"
+                      style="width: 20px; height: 20px; color: #fff"
+                    ></i>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 14px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <span
+                    style="
+                      font-size: 12px;
+                      color: rgba(255, 255, 255, 0.8);
+                      background: rgba(255, 255, 255, 0.2);
+                      padding: 4px 10px;
+                      border-radius: 8px;
+                    "
+                    >₦210k Paid</span
+                  >
+                  <span
+                    style="
+                      font-size: 12px;
+                      color: rgba(255, 255, 255, 0.8);
+                      background: rgba(255, 255, 255, 0.2);
+                      padding: 4px 10px;
+                      border-radius: 8px;
+                    "
+                    >₦74k Pending</span
+                  >
+                </div>
+              </div>
+
+              <div class="stat-snap card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div>
+                    <p
+                      style="
+                        color: #8a9bb0;
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Stock Alerts
+                    </p>
+                    <p
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #0d1117;
+                        font-size: 38px;
+                        margin-top: 6px;
+                        line-height: 1;
+                      "
+                    >
+                      7
+                    </p>
+                    <p style="color: #e8927c; font-size: 12px; margin-top: 4px">
+                      Items running low
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      width: 40px;
+                      height: 40px;
+                      background: #faf0ed;
+                      border-radius: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i
+                      data-lucide="alert-triangle"
+                      style="width: 20px; height: 20px; color: #e8927c"
+                    ></i>
+                  </div>
+                </div>
+                <button
+                  style="
+                    margin-top: 16px;
+                    font-size: 12px;
+                    color: #e8927c;
+                    font-weight: 600;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 0;
+                  "
+                >
+                  View inventory
+                  <i
+                    data-lucide="arrow-right"
+                    style="width: 13px; height: 13px"
+                  ></i>
+                </button>
+              </div>
+            </div>
+            <p
+              style="
+                text-align: center;
+                font-size: 11px;
+                color: rgba(138, 155, 176, 0.5);
+                padding: 4px 0 0;
+              "
+              class="sm:hidden"
+              id="swipe-hint"
+            >
+              ← swipe for more →
+            </p>
+          </div>
+
+          <!-- INNER PADDED CONTENT -->
+          <div style="padding: 0 16px 16px" id="padded-content">
+            <!-- ROW 2: Chart + Queue -->
+            <div
+              class="fu d2"
+              style="
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 16px;
+                margin-bottom: 16px;
+              "
+            >
+              <!-- Revenue Chart -->
+              <div class="card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    margin-bottom: 18px;
+                    gap: 10px;
+                  "
+                >
+                  <div>
+                    <h2
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #0d1117;
+                        font-size: 18px;
+                      "
+                    >
+                      Revenue Overview
+                    </h2>
+                    <p style="color: #8a9bb0; font-size: 13px; margin-top: 2px">
+                      Monthly income — 2026
+                    </p>
+                  </div>
+                  <div style="display: flex; gap: 6px; flex-shrink: 0">
+                    <button
+                      style="
+                        font-size: 12px;
+                        padding: 6px 12px;
+                        background: #4a7c59;
+                        color: #fff;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 500;
+                        cursor: pointer;
+                      "
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      style="
+                        font-size: 12px;
+                        padding: 6px 10px;
+                        color: #8a9bb0;
+                        background: #eef2f7;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                      "
+                      class="hidden-xs"
+                    >
+                      Weekly
+                    </button>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 6px;
+                    height: 120px;
+                  "
+                >
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div class="cbar" style="width: 100%; height: 60%">
+                      <div class="cbar-fill" style="height: 60%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Jan</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div class="cbar" style="width: 100%; height: 75%">
+                      <div class="cbar-fill" style="height: 75%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Feb</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div
+                      class="cbar"
+                      style="width: 100%; height: 90%; background: #e8f2eb"
+                    >
+                      <div
+                        class="cbar-fill"
+                        style="height: 90%; background: #2f5c3a"
+                      ></div>
+                    </div>
+                    <span
+                      style="font-size: 10px; color: #4a7c59; font-weight: 600"
+                      >Mar</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div class="cbar" style="width: 100%; height: 50%">
+                      <div class="cbar-fill" style="height: 50%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Apr</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div class="cbar" style="width: 100%; height: 65%">
+                      <div class="cbar-fill" style="height: 65%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">May</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div class="cbar" style="width: 100%; height: 55%">
+                      <div class="cbar-fill" style="height: 55%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Jun</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div class="cbar" style="width: 100%; height: 80%">
+                      <div class="cbar-fill" style="height: 80%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Jul</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                    class="hidden-xs2"
+                  >
+                    <div class="cbar" style="width: 100%; height: 45%">
+                      <div class="cbar-fill" style="height: 45%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Aug</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                    class="hidden-xs2"
+                  >
+                    <div class="cbar" style="width: 100%; height: 70%">
+                      <div class="cbar-fill" style="height: 70%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Sep</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                    class="hidden-xs2"
+                  >
+                    <div class="cbar" style="width: 100%; height: 58%">
+                      <div class="cbar-fill" style="height: 58%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Oct</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                    class="hidden-xs2"
+                  >
+                    <div class="cbar" style="width: 100%; height: 40%">
+                      <div class="cbar-fill" style="height: 40%"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Nov</span>
+                  </div>
+                  <div
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                    class="hidden-xs2"
+                  >
+                    <div class="cbar" style="width: 100%; height: 28%">
+                      <div
+                        class="cbar-fill"
+                        style="height: 28%; opacity: 0.35"
+                      ></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8a9bb0">Dec</span>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    gap: 14px;
+                    margin-top: 12px;
+                    padding-top: 12px;
+                    border-top: 1px solid rgba(13, 17, 23, 0.06);
+                    flex-wrap: wrap;
+                  "
+                >
+                  <span
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      font-size: 12px;
+                      color: #8a9bb0;
+                    "
+                    ><span
+                      style="
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 3px;
+                        background: #4a7c59;
+                      "
+                    ></span
+                    >Consultation</span
+                  >
+                  <span
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      font-size: 12px;
+                      color: #8a9bb0;
+                    "
+                    ><span
+                      style="
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 3px;
+                        background: #e8927c;
+                      "
+                    ></span
+                    >Pharmacy</span
+                  >
+                  <span
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      font-size: 12px;
+                      color: #8a9bb0;
+                    "
+                    ><span
+                      style="
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 3px;
+                        background: #c9a84c;
+                      "
+                    ></span
+                    >Lab</span
+                  >
+                </div>
+              </div>
+
+              <!-- Live Queue -->
+              <div class="card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 16px;
+                  "
+                >
+                  <div>
+                    <h2
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #0d1117;
+                        font-size: 18px;
+                      "
+                    >
+                      Live Queue
+                    </h2>
+                    <p
+                      style="
+                        color: #8a9bb0;
+                        font-size: 13px;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        margin-top: 2px;
+                      "
+                    >
+                      <span
+                        class="pdot"
+                        style="
+                          width: 8px;
+                          height: 8px;
+                          background: #4a7c59;
+                          border-radius: 50%;
+                          display: inline-block;
+                        "
+                      ></span>
+                      8 waiting now
+                    </p>
+                  </div>
+                  <button
+                    style="
+                      font-size: 12px;
+                      color: #4a7c59;
+                      font-weight: 600;
+                      background: none;
+                      border: none;
+                      cursor: pointer;
+                    "
+                  >
+                    Manage
+                  </button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      background: #e8f2eb;
+                      border-radius: 12px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #4a7c59;
+                        font-size: 16px;
+                        font-weight: 700;
+                        width: 22px;
+                        flex-shrink: 0;
+                      "
+                      >01</span
+                    >
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Chioma Eze
+                      </p>
+                      <p
+                        style="
+                          font-size: 12px;
+                          color: #8a9bb0;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Dr. Bello · Gen. Practice
+                      </p>
+                    </div>
+                    <button
+                      style="
+                        font-size: 12px;
+                        background: #4a7c59;
+                        color: #fff;
+                        padding: 5px 12px;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        flex-shrink: 0;
+                      "
+                    >
+                      Call In
+                    </button>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      border-radius: 12px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #8a9bb0;
+                        font-size: 16px;
+                        width: 22px;
+                        flex-shrink: 0;
+                      "
+                      >02</span
+                    >
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Femi Adeyemi
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dr. Okafor · Cardiology
+                      </p>
+                    </div>
+                    <span
+                      style="font-size: 12px; color: #8a9bb0; flex-shrink: 0"
+                      >~12 min</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      border-radius: 12px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #8a9bb0;
+                        font-size: 16px;
+                        width: 22px;
+                        flex-shrink: 0;
+                      "
+                      >03</span
+                    >
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Ngozi Nnadi
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dr. Adaeze · Pediatrics
+                      </p>
+                    </div>
+                    <span
+                      style="font-size: 12px; color: #8a9bb0; flex-shrink: 0"
+                      >~25 min</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      border-radius: 12px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #8a9bb0;
+                        font-size: 16px;
+                        width: 22px;
+                        flex-shrink: 0;
+                      "
+                      >04</span
+                    >
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Emeka Chukwu
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dr. Yusuf · Dermatology
+                      </p>
+                    </div>
+                    <span
+                      style="font-size: 12px; color: #8a9bb0; flex-shrink: 0"
+                      >~38 min</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      border-radius: 12px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: &quot;DM Serif Display&quot;, serif;
+                        color: #8a9bb0;
+                        font-size: 16px;
+                        width: 22px;
+                        flex-shrink: 0;
+                      "
+                      >05</span
+                    >
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Blessing Obi
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dr. Bello · Gen. Practice
+                      </p>
+                    </div>
+                    <span
+                      style="font-size: 12px; color: #8a9bb0; flex-shrink: 0"
+                      >~51 min</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /row2 -->
+
+            <!-- ROW 3: Table -->
+            <div
+              class="fu d3 card"
+              style="margin-bottom: 16px; overflow: hidden"
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 16px 20px;
+                  border-bottom: 1px solid rgba(13, 17, 23, 0.06);
+                "
+              >
+                <div>
+                  <h2
+                    style="
+                      font-family: &quot;DM Serif Display&quot;, serif;
+                      color: #0d1117;
+                      font-size: 18px;
+                    "
+                  >
+                    Today's Schedule
+                  </h2>
+                  <p style="color: #8a9bb0; font-size: 13px; margin-top: 2px">
+                    47 appointments · 5 March
+                  </p>
+                </div>
+                <div style="display: flex; gap: 6px">
+                  <button
+                    style="
+                      font-size: 12px;
+                      padding: 6px 12px;
+                      background: #4a7c59;
+                      color: #fff;
+                      border: none;
+                      border-radius: 8px;
+                      font-weight: 500;
+                      cursor: pointer;
+                    "
+                  >
+                    Upcoming
+                  </button>
+                  <button
+                    style="
+                      font-size: 12px;
+                      padding: 6px 10px;
+                      color: #8a9bb0;
+                      background: #eef2f7;
+                      border: none;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                    class="hidden-xs"
+                  >
+                    All
+                  </button>
+                </div>
+              </div>
+              <div class="tbl-wrap">
+                <table style="width: 100%; border-collapse: collapse">
+                  <thead>
+                    <tr style="border-bottom: 1px solid rgba(13, 17, 23, 0.06)">
+                      <th
+                        style="
+                          text-align: left;
+                          font-size: 11px;
+                          color: #8a9bb0;
+                          font-weight: 600;
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                          padding: 10px 20px;
+                        "
+                      >
+                        Patient
+                      </th>
+                      <th
+                        style="
+                          text-align: left;
+                          font-size: 11px;
+                          color: #8a9bb0;
+                          font-weight: 600;
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                          padding: 10px 12px;
+                        "
+                      >
+                        Doctor
+                      </th>
+                      <th
+                        style="
+                          text-align: left;
+                          font-size: 11px;
+                          color: #8a9bb0;
+                          font-weight: 600;
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                          padding: 10px 12px;
+                        "
+                      >
+                        Time
+                      </th>
+                      <th
+                        style="
+                          text-align: left;
+                          font-size: 11px;
+                          color: #8a9bb0;
+                          font-weight: 600;
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                          padding: 10px 12px;
+                        "
+                      >
+                        Status
+                      </th>
+                      <th style="padding: 10px 12px; width: 32px"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      style="
+                        border-bottom: 1px solid rgba(13, 17, 23, 0.05);
+                        background: rgba(232, 242, 235, 0.3);
+                      "
+                    >
+                      <td style="padding: 12px 20px">
+                        <div
+                          style="display: flex; align-items: center; gap: 10px"
+                        >
+                          <div
+                            class="av"
+                            style="background: #4a7c59; color: #fff"
+                          >
+                            CE
+                          </div>
+                          <div>
+                            <p
+                              style="
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: #0d1117;
+                              "
+                            >
+                              Chioma Eze
+                            </p>
+                            <p style="font-size: 11px; color: #8a9bb0">
+                              P-00421
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding: 12px">
+                        <p style="font-size: 13px; color: #0d1117">Dr. Bello</p>
+                        <p style="font-size: 11px; color: #8a9bb0">
+                          Gen. Practice
+                        </p>
+                      </td>
+                      <td
+                        style="
+                          padding: 12px;
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                        "
+                      >
+                        09:00 AM
+                      </td>
+                      <td style="padding: 12px">
+                        <span class="badge b-checkin">Checked-In</span>
+                      </td>
+                      <td style="padding: 12px">
+                        <button
+                          style="
+                            background: none;
+                            border: none;
+                            cursor: pointer;
+                            color: #8a9bb0;
+                          "
+                        >
+                          <i
+                            data-lucide="more-horizontal"
+                            style="width: 16px; height: 16px"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(13, 17, 23, 0.05)">
+                      <td style="padding: 12px 20px">
+                        <div
+                          style="display: flex; align-items: center; gap: 10px"
+                        >
+                          <div
+                            class="av"
+                            style="background: #c9a84c; color: #fff"
+                          >
+                            FA
+                          </div>
+                          <div>
+                            <p
+                              style="
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: #0d1117;
+                              "
+                            >
+                              Femi Adeyemi
+                            </p>
+                            <p style="font-size: 11px; color: #8a9bb0">
+                              P-00398
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding: 12px">
+                        <p style="font-size: 13px; color: #0d1117">
+                          Dr. Okafor
+                        </p>
+                        <p style="font-size: 11px; color: #8a9bb0">
+                          Cardiology
+                        </p>
+                      </td>
+                      <td
+                        style="
+                          padding: 12px;
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                        "
+                      >
+                        09:30 AM
+                      </td>
+                      <td style="padding: 12px">
+                        <span class="badge b-scheduled">Scheduled</span>
+                      </td>
+                      <td style="padding: 12px">
+                        <button
+                          style="
+                            background: none;
+                            border: none;
+                            cursor: pointer;
+                            color: #8a9bb0;
+                          "
+                        >
+                          <i
+                            data-lucide="more-horizontal"
+                            style="width: 16px; height: 16px"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(13, 17, 23, 0.05)">
+                      <td style="padding: 12px 20px">
+                        <div
+                          style="display: flex; align-items: center; gap: 10px"
+                        >
+                          <div
+                            class="av"
+                            style="background: #e8927c; color: #fff"
+                          >
+                            NN
+                          </div>
+                          <div>
+                            <p
+                              style="
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: #0d1117;
+                              "
+                            >
+                              Ngozi Nnadi
+                            </p>
+                            <p style="font-size: 11px; color: #8a9bb0">
+                              P-00312
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding: 12px">
+                        <p style="font-size: 13px; color: #0d1117">
+                          Dr. Adaeze
+                        </p>
+                        <p style="font-size: 11px; color: #8a9bb0">
+                          Pediatrics
+                        </p>
+                      </td>
+                      <td
+                        style="
+                          padding: 12px;
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                        "
+                      >
+                        10:00 AM
+                      </td>
+                      <td style="padding: 12px">
+                        <span class="badge b-scheduled">Scheduled</span>
+                      </td>
+                      <td style="padding: 12px">
+                        <button
+                          style="
+                            background: none;
+                            border: none;
+                            cursor: pointer;
+                            color: #8a9bb0;
+                          "
+                        >
+                          <i
+                            data-lucide="more-horizontal"
+                            style="width: 16px; height: 16px"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(13, 17, 23, 0.05)">
+                      <td style="padding: 12px 20px">
+                        <div
+                          style="display: flex; align-items: center; gap: 10px"
+                        >
+                          <div
+                            class="av"
+                            style="background: #0d1117; color: #fff"
+                          >
+                            EC
+                          </div>
+                          <div>
+                            <p
+                              style="
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: #0d1117;
+                              "
+                            >
+                              Emeka Chukwu
+                            </p>
+                            <p style="font-size: 11px; color: #8a9bb0">
+                              P-00289
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding: 12px">
+                        <p style="font-size: 13px; color: #0d1117">Dr. Yusuf</p>
+                        <p style="font-size: 11px; color: #8a9bb0">
+                          Dermatology
+                        </p>
+                      </td>
+                      <td
+                        style="
+                          padding: 12px;
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                        "
+                      >
+                        10:45 AM
+                      </td>
+                      <td style="padding: 12px">
+                        <span class="badge b-completed">Completed</span>
+                      </td>
+                      <td style="padding: 12px">
+                        <button
+                          style="
+                            background: none;
+                            border: none;
+                            cursor: pointer;
+                            color: #8a9bb0;
+                          "
+                        >
+                          <i
+                            data-lucide="more-horizontal"
+                            style="width: 16px; height: 16px"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(13, 17, 23, 0.05)">
+                      <td style="padding: 12px 20px">
+                        <div
+                          style="display: flex; align-items: center; gap: 10px"
+                        >
+                          <div
+                            class="av"
+                            style="background: #8a9bb0; color: #fff"
+                          >
+                            BO
+                          </div>
+                          <div>
+                            <p
+                              style="
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: #0d1117;
+                              "
+                            >
+                              Blessing Obi
+                            </p>
+                            <p style="font-size: 11px; color: #8a9bb0">
+                              P-00441
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding: 12px">
+                        <p style="font-size: 13px; color: #0d1117">Dr. Bello</p>
+                        <p style="font-size: 11px; color: #8a9bb0">
+                          Gen. Practice
+                        </p>
+                      </td>
+                      <td
+                        style="
+                          padding: 12px;
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                        "
+                      >
+                        11:15 AM
+                      </td>
+                      <td style="padding: 12px">
+                        <span class="badge b-noshow">No-Show</span>
+                      </td>
+                      <td style="padding: 12px">
+                        <button
+                          style="
+                            background: none;
+                            border: none;
+                            cursor: pointer;
+                            color: #8a9bb0;
+                          "
+                        >
+                          <i
+                            data-lucide="more-horizontal"
+                            style="width: 16px; height: 16px"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 20px">
+                        <div
+                          style="display: flex; align-items: center; gap: 10px"
+                        >
+                          <div
+                            class="av"
+                            style="background: #6ba37a; color: #fff"
+                          >
+                            KA
+                          </div>
+                          <div>
+                            <p
+                              style="
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: #0d1117;
+                              "
+                            >
+                              Kemi Adeoye
+                            </p>
+                            <p style="font-size: 11px; color: #8a9bb0">
+                              P-00177
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding: 12px">
+                        <p style="font-size: 13px; color: #0d1117">
+                          Dr. Okafor
+                        </p>
+                        <p style="font-size: 11px; color: #8a9bb0">
+                          Cardiology
+                        </p>
+                      </td>
+                      <td
+                        style="
+                          padding: 12px;
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                        "
+                      >
+                        02:00 PM
+                      </td>
+                      <td style="padding: 12px">
+                        <span class="badge b-cancelled">Cancelled</span>
+                      </td>
+                      <td style="padding: 12px">
+                        <button
+                          style="
+                            background: none;
+                            border: none;
+                            cursor: pointer;
+                            color: #8a9bb0;
+                          "
+                        >
+                          <i
+                            data-lucide="more-horizontal"
+                            style="width: 16px; height: 16px"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div
+                style="
+                  padding: 12px 20px;
+                  border-top: 1px solid rgba(13, 17, 23, 0.06);
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                "
+              >
+                <p style="font-size: 12px; color: #8a9bb0">Showing 6 of 47</p>
+                <button
+                  style="
+                    font-size: 12px;
+                    color: #4a7c59;
+                    font-weight: 600;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  View full schedule
+                  <i
+                    data-lucide="arrow-right"
+                    style="width: 13px; height: 13px"
+                  ></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- ROW 4: On Duty + Quick Actions + Stock -->
+            <div
+              class="fu d3"
+              style="
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 16px;
+                margin-bottom: 16px;
+              "
+              id="row4"
+            >
+              <!-- On Duty -->
+              <div class="card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 16px;
+                  "
+                >
+                  <h2
+                    style="
+                      font-family: &quot;DM Serif Display&quot;, serif;
+                      color: #0d1117;
+                      font-size: 18px;
+                    "
+                  >
+                    On Duty Today
+                  </h2>
+                  <span class="badge b-scheduled">6 Active</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <div class="av" style="background: #4a7c59; color: #fff">
+                      DB
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Dr. Bello
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Gen. Practice · 12 pts
+                      </p>
+                    </div>
+                    <span
+                      style="
+                        width: 8px;
+                        height: 8px;
+                        background: #4a7c59;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                      "
+                    ></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <div class="av" style="background: #c9a84c; color: #fff">
+                      IO
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Dr. Okafor
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Cardiology · 9 pts
+                      </p>
+                    </div>
+                    <span
+                      style="
+                        width: 8px;
+                        height: 8px;
+                        background: #4a7c59;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                      "
+                    ></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <div class="av" style="background: #e8927c; color: #fff">
+                      AO
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Dr. Adaeze
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Pediatrics · 8 pts
+                      </p>
+                    </div>
+                    <span
+                      style="
+                        width: 8px;
+                        height: 8px;
+                        background: #c9a84c;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                      "
+                    ></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <div class="av" style="background: #0d1117; color: #fff">
+                      MY
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Dr. Yusuf
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dermatology · 6 pts
+                      </p>
+                    </div>
+                    <span
+                      style="
+                        width: 8px;
+                        height: 8px;
+                        background: #c9a84c;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                      "
+                    ></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <div
+                      class="av"
+                      style="
+                        background: #eef2f7;
+                        color: #0d1117;
+                        border: 1px solid rgba(13, 17, 23, 0.1);
+                      "
+                    >
+                      ZA
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Dr. Amaka
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Obs/Gynae · 7 pts
+                      </p>
+                    </div>
+                    <span
+                      style="
+                        width: 8px;
+                        height: 8px;
+                        background: #8a9bb0;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                      "
+                    ></span>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                    margin-top: 12px;
+                    padding-top: 12px;
+                    border-top: 1px solid rgba(13, 17, 23, 0.06);
+                    font-size: 11px;
+                    color: #8a9bb0;
+                  "
+                >
+                  <span style="display: flex; align-items: center; gap: 5px"
+                    ><span
+                      style="
+                        width: 7px;
+                        height: 7px;
+                        background: #4a7c59;
+                        border-radius: 50%;
+                      "
+                    ></span
+                    >Available</span
+                  >
+                  <span style="display: flex; align-items: center; gap: 5px"
+                    ><span
+                      style="
+                        width: 7px;
+                        height: 7px;
+                        background: #c9a84c;
+                        border-radius: 50%;
+                      "
+                    ></span
+                    >In Session</span
+                  >
+                  <span style="display: flex; align-items: center; gap: 5px"
+                    ><span
+                      style="
+                        width: 7px;
+                        height: 7px;
+                        background: #8a9bb0;
+                        border-radius: 50%;
+                      "
+                    ></span
+                    >Break</span
+                  >
+                </div>
+              </div>
+
+              <!-- Quick Actions -->
+              <div class="card" style="padding: 20px">
+                <h2
+                  style="
+                    font-family: &quot;DM Serif Display&quot;, serif;
+                    color: #0d1117;
+                    font-size: 18px;
+                    margin-bottom: 14px;
+                  "
+                >
+                  Quick Actions
+                </h2>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 10px;
+                  "
+                >
+                  <button
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 14px 10px;
+                      background: #e8f2eb;
+                      border: none;
+                      border-radius: 12px;
+                      cursor: pointer;
+                      transition: background 0.15s;
+                    "
+                    onmouseover="
+                      this.style.background = '#4A7C59';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '#fff';
+                      });
+                    "
+                    onmouseout="
+                      this.style.background = '#E8F2EB';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '';
+                      });
+                    "
+                  >
+                    <i
+                      data-lucide="user-plus"
+                      style="width: 20px; height: 20px; color: #4a7c59"
+                    ></i>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: #4a7c59;
+                        line-height: 1.3;
+                        text-align: center;
+                      "
+                      >New Patient</span
+                    >
+                  </button>
+                  <button
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 14px 10px;
+                      background: #faf0ed;
+                      border: none;
+                      border-radius: 12px;
+                      cursor: pointer;
+                    "
+                    onmouseover="
+                      this.style.background = '#E8927C';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '#fff';
+                      });
+                    "
+                    onmouseout="
+                      this.style.background = '#FAF0ED';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '';
+                      });
+                    "
+                  >
+                    <i
+                      data-lucide="file-text"
+                      style="width: 20px; height: 20px; color: #e8927c"
+                    ></i>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: #e8927c;
+                        line-height: 1.3;
+                        text-align: center;
+                      "
+                      >New Invoice</span
+                    >
+                  </button>
+                  <button
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 14px 10px;
+                      background: #fbf6e9;
+                      border: none;
+                      border-radius: 12px;
+                      cursor: pointer;
+                    "
+                    onmouseover="
+                      this.style.background = '#C9A84C';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '#fff';
+                      });
+                    "
+                    onmouseout="
+                      this.style.background = '#FBF6E9';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '';
+                      });
+                    "
+                  >
+                    <i
+                      data-lucide="pill"
+                      style="width: 20px; height: 20px; color: #c9a84c"
+                    ></i>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: #c9a84c;
+                        line-height: 1.3;
+                        text-align: center;
+                      "
+                      >Prescribe</span
+                    >
+                  </button>
+                  <button
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 14px 10px;
+                      background: #eef2f7;
+                      border: none;
+                      border-radius: 12px;
+                      cursor: pointer;
+                    "
+                    onmouseover="
+                      this.style.background = '#0D1117';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '#fff';
+                      });
+                    "
+                    onmouseout="
+                      this.style.background = '#EEF2F7';
+                      this.querySelectorAll('*').forEach((e) => {
+                        e.style.color = '';
+                      });
+                    "
+                  >
+                    <i
+                      data-lucide="clipboard-list"
+                      style="width: 20px; height: 20px; color: #0d1117"
+                    ></i>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: #0d1117;
+                        line-height: 1.3;
+                        text-align: center;
+                      "
+                      >Lab Request</span
+                    >
+                  </button>
+                </div>
+              </div>
+
+              <!-- Stock Alerts -->
+              <div class="card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 14px;
+                  "
+                >
+                  <h2
+                    style="
+                      font-family: &quot;DM Serif Display&quot;, serif;
+                      color: #0d1117;
+                      font-size: 18px;
+                    "
+                  >
+                    Stock Alerts
+                  </h2>
+                  <span class="badge b-cancelled">7 Low</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      background: #faf0ed;
+                      border-radius: 10px;
+                    "
+                  >
+                    <i
+                      data-lucide="alert-circle"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #e8927c;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Amoxicillin 500mg
+                      </p>
+                      <div class="prog" style="margin-top: 6px">
+                        <div
+                          class="prog-fill"
+                          style="width: 8%; background: #e8927c"
+                        ></div>
+                      </div>
+                    </div>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: #e8927c;
+                        flex-shrink: 0;
+                      "
+                      >12 left</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      background: #fbf6e9;
+                      border-radius: 10px;
+                    "
+                  >
+                    <i
+                      data-lucide="alert-circle"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #c9a84c;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Paracetamol 1g IV
+                      </p>
+                      <div class="prog" style="margin-top: 6px">
+                        <div
+                          class="prog-fill"
+                          style="width: 22%; background: #c9a84c"
+                        ></div>
+                      </div>
+                    </div>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: #c9a84c;
+                        flex-shrink: 0;
+                      "
+                      >34 left</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px 12px;
+                      background: #fbf6e9;
+                      border-radius: 10px;
+                    "
+                  >
+                    <i
+                      data-lucide="alert-circle"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #c9a84c;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Metformin 850mg
+                      </p>
+                      <div class="prog" style="margin-top: 6px">
+                        <div
+                          class="prog-fill"
+                          style="width: 18%; background: #c9a84c"
+                        ></div>
+                      </div>
+                    </div>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: #c9a84c;
+                        flex-shrink: 0;
+                      "
+                      >27 left</span
+                    >
+                  </div>
+                </div>
+                <button
+                  style="
+                    margin-top: 12px;
+                    width: 100%;
+                    font-size: 12px;
+                    color: #e8927c;
+                    font-weight: 600;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 4px;
+                  "
+                >
+                  Create purchase order
+                  <i
+                    data-lucide="arrow-right"
+                    style="width: 13px; height: 13px"
+                  ></i>
+                </button>
+              </div>
+            </div>
+            <!-- /row4 -->
+
+            <!-- ROW 5: Recent Patients + Audit Trail -->
+            <div
+              class="fu d4"
+              style="display: grid; grid-template-columns: 1fr; gap: 16px"
+              id="row5"
+            >
+              <!-- Recent Patients -->
+              <div class="card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 14px;
+                  "
+                >
+                  <h2
+                    style="
+                      font-family: &quot;DM Serif Display&quot;, serif;
+                      color: #0d1117;
+                      font-size: 18px;
+                    "
+                  >
+                    Recent Patients
+                  </h2>
+                  <button
+                    style="
+                      font-size: 12px;
+                      color: #4a7c59;
+                      font-weight: 600;
+                      background: none;
+                      border: none;
+                      cursor: pointer;
+                    "
+                  >
+                    All patients
+                  </button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px;
+                      border-radius: 10px;
+                      cursor: pointer;
+                    "
+                    onmouseover="this.style.background = '#EEF2F7'"
+                    onmouseout="this.style.background = 'transparent'"
+                  >
+                    <div class="av" style="background: #4a7c59; color: #fff">
+                      CE
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Chioma Eze, 29F
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Hypertension · Today
+                      </p>
+                    </div>
+                    <i
+                      data-lucide="chevron-right"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #8a9bb0;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px;
+                      border-radius: 10px;
+                      cursor: pointer;
+                    "
+                    onmouseover="this.style.background = '#EEF2F7'"
+                    onmouseout="this.style.background = 'transparent'"
+                  >
+                    <div class="av" style="background: #c9a84c; color: #fff">
+                      FA
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Femi Adeyemi, 54M
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Cardiac Arrhythmia · Today
+                      </p>
+                    </div>
+                    <i
+                      data-lucide="chevron-right"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #8a9bb0;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px;
+                      border-radius: 10px;
+                      cursor: pointer;
+                    "
+                    onmouseover="this.style.background = '#EEF2F7'"
+                    onmouseout="this.style.background = 'transparent'"
+                  >
+                    <div class="av" style="background: #e8927c; color: #fff">
+                      NN
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Ngozi Nnadi, 7F
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Pediatric Check · Today
+                      </p>
+                    </div>
+                    <i
+                      data-lucide="chevron-right"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #8a9bb0;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px;
+                      border-radius: 10px;
+                      cursor: pointer;
+                    "
+                    onmouseover="this.style.background = '#EEF2F7'"
+                    onmouseout="this.style.background = 'transparent'"
+                  >
+                    <div class="av" style="background: #0d1117; color: #fff">
+                      EC
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Emeka Chukwu, 38M
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Eczema · Yesterday
+                      </p>
+                    </div>
+                    <i
+                      data-lucide="chevron-right"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #8a9bb0;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      padding: 10px;
+                      border-radius: 10px;
+                      cursor: pointer;
+                    "
+                    onmouseover="this.style.background = '#EEF2F7'"
+                    onmouseout="this.style.background = 'transparent'"
+                  >
+                    <div
+                      class="av"
+                      style="
+                        background: #eef2f7;
+                        color: #0d1117;
+                        border: 1px solid rgba(13, 17, 23, 0.1);
+                      "
+                    >
+                      ZA
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        Zainab Abdullahi, 32F
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Prenatal Visit · 4 Mar
+                      </p>
+                    </div>
+                    <i
+                      data-lucide="chevron-right"
+                      style="
+                        width: 15px;
+                        height: 15px;
+                        color: #8a9bb0;
+                        flex-shrink: 0;
+                      "
+                    ></i>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Audit Trail -->
+              <div class="card" style="padding: 20px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 14px;
+                  "
+                >
+                  <h2
+                    style="
+                      font-family: &quot;DM Serif Display&quot;, serif;
+                      color: #0d1117;
+                      font-size: 18px;
+                    "
+                  >
+                    Audit Trail
+                  </h2>
+                  <button
+                    style="
+                      font-size: 12px;
+                      color: #4a7c59;
+                      font-weight: 600;
+                      background: none;
+                      border: none;
+                      cursor: pointer;
+                    "
+                  >
+                    Full log
+                  </button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0">
+                  <div style="display: flex; gap: 10px">
+                    <div
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                      "
+                    >
+                      <div
+                        style="
+                          width: 28px;
+                          height: 28px;
+                          background: #e8f2eb;
+                          border-radius: 50%;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          flex-shrink: 0;
+                        "
+                      >
+                        <i
+                          data-lucide="file-pen"
+                          style="width: 13px; height: 13px; color: #4a7c59"
+                        ></i>
+                      </div>
+                      <div
+                        style="
+                          width: 1px;
+                          flex: 1;
+                          background: rgba(13, 17, 23, 0.1);
+                          min-height: 20px;
+                        "
+                      ></div>
+                    </div>
+                    <div style="padding-bottom: 14px">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                        "
+                      >
+                        Medical note edited
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dr. Bello · Patient P-00421
+                      </p>
+                      <p
+                        style="
+                          font-size: 11px;
+                          color: rgba(138, 155, 176, 0.6);
+                          margin-top: 2px;
+                        "
+                      >
+                        09:43 AM · Today
+                      </p>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 10px">
+                    <div
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                      "
+                    >
+                      <div
+                        style="
+                          width: 28px;
+                          height: 28px;
+                          background: #fbf6e9;
+                          border-radius: 50%;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          flex-shrink: 0;
+                        "
+                      >
+                        <i
+                          data-lucide="log-in"
+                          style="width: 13px; height: 13px; color: #c9a84c"
+                        ></i>
+                      </div>
+                      <div
+                        style="
+                          width: 1px;
+                          flex: 1;
+                          background: rgba(13, 17, 23, 0.1);
+                          min-height: 20px;
+                        "
+                      ></div>
+                    </div>
+                    <div style="padding-bottom: 14px">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                        "
+                      >
+                        Staff login
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Nurse Ifeoma · IP 197.x.x.1
+                      </p>
+                      <p
+                        style="
+                          font-size: 11px;
+                          color: rgba(138, 155, 176, 0.6);
+                          margin-top: 2px;
+                        "
+                      >
+                        08:52 AM · Today
+                      </p>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 10px">
+                    <div
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                      "
+                    >
+                      <div
+                        style="
+                          width: 28px;
+                          height: 28px;
+                          background: #faf0ed;
+                          border-radius: 50%;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          flex-shrink: 0;
+                        "
+                      >
+                        <i
+                          data-lucide="eye"
+                          style="width: 13px; height: 13px; color: #e8927c"
+                        ></i>
+                      </div>
+                      <div
+                        style="
+                          width: 1px;
+                          flex: 1;
+                          background: rgba(13, 17, 23, 0.1);
+                          min-height: 20px;
+                        "
+                      ></div>
+                    </div>
+                    <div style="padding-bottom: 14px">
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                        "
+                      >
+                        Record accessed
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Dr. Okafor · Patient P-00398
+                      </p>
+                      <p
+                        style="
+                          font-size: 11px;
+                          color: rgba(138, 155, 176, 0.6);
+                          margin-top: 2px;
+                        "
+                      >
+                        08:31 AM · Today
+                      </p>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 10px">
+                    <div
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                      "
+                    >
+                      <div
+                        style="
+                          width: 28px;
+                          height: 28px;
+                          background: #e8f2eb;
+                          border-radius: 50%;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          flex-shrink: 0;
+                        "
+                      >
+                        <i
+                          data-lucide="receipt"
+                          style="width: 13px; height: 13px; color: #4a7c59"
+                        ></i>
+                      </div>
+                    </div>
+                    <div>
+                      <p
+                        style="
+                          font-size: 14px;
+                          font-weight: 500;
+                          color: #0d1117;
+                        "
+                      >
+                        Invoice generated
+                      </p>
+                      <p style="font-size: 12px; color: #8a9bb0">
+                        Receptionist Ada · INV-2841
+                      </p>
+                      <p
+                        style="
+                          font-size: 11px;
+                          color: rgba(138, 155, 176, 0.6);
+                          margin-top: 2px;
+                        "
+                      >
+                        08:15 AM · Today
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /row5 -->
+          </div>
+          <!-- /padded-content -->
+        </div>
+        <!-- /scroll-area -->
+      </div>
+      <!-- /main -->
+    </div>
+    <!-- /app -->
+
+    <!-- ══ BOTTOM NAV ══ -->
+    <nav id="bottom-nav">
+      <a href="#" class="active">
+        <i data-lucide="layout-dashboard" style="width: 20px; height: 20px"></i>
+        <span>Home</span>
+      </a>
+      <a href="#">
+        <i data-lucide="calendar-days" style="width: 20px; height: 20px"></i>
+        <span>Schedule</span>
+      </a>
+      <a href="#">
+        <i data-lucide="users" style="width: 20px; height: 20px"></i>
+        <span>Patients</span>
+      </a>
+      <a href="#">
+        <i data-lucide="receipt" style="width: 20px; height: 20px"></i>
+        <span>Billing</span>
+      </a>
+      <a href="#">
+        <i data-lucide="settings" style="width: 20px; height: 20px"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    <script>
+      lucide.createIcons();
+
+      // ── SIDEBAR TOGGLE ──
+      function openSidebar() {
+        document.getElementById("sidebar").classList.add("open");
+        document.getElementById("overlay").classList.add("show");
+        document.body.style.overflow = "hidden";
+      }
+      function closeSidebar() {
+        document.getElementById("sidebar").classList.remove("open");
+        document.getElementById("overlay").classList.remove("show");
+        document.body.style.overflow = "";
+      }
+      window.addEventListener("resize", () => {
+        if (window.innerWidth >= 1024) closeSidebar();
+      });
+
+      // ── RESPONSIVE LAYOUT ADJUSTMENTS ──
+      function applyLayout() {
+        const w = window.innerWidth;
+        const row2 = document.querySelector(".fu.d2");
+        const row4 = document.getElementById("row4");
+        const row5 = document.getElementById("row5");
+        const dateSub = document.getElementById("date-sub");
+        const searchWrap = document.getElementById("search-wrap");
+        const mobSearch = document.getElementById("mob-search");
+        const apptLabel = document.getElementById("appt-label");
+        const swipeHint = document.getElementById("swipe-hint");
+        const padded = document.getElementById("padded-content");
+
+        // Topbar
+        dateSub.style.display = w >= 640 ? "block" : "none";
+        searchWrap.style.display = w >= 768 ? "flex" : "none";
+        mobSearch.style.display = w >= 768 ? "none" : "flex";
+        apptLabel.textContent = w >= 480 ? "New Appointment" : "New";
+
+        // Padding
+        padded.style.padding = w >= 768 ? "0 24px 24px" : "0 16px 16px";
+
+        // Swipe hint: hide on tablet+
+        if (swipeHint) swipeHint.style.display = w >= 768 ? "none" : "block";
+
+        // Chart + Queue: side by side on lg+
+        if (row2)
+          row2.style.gridTemplateColumns = w >= 1024 ? "2fr 1fr" : "1fr";
+
+        // Row 4: 3 cols on lg, 2 on md, 1 on sm
+        if (row4) {
+          if (w >= 1024) row4.style.gridTemplateColumns = "1fr 1fr 1fr";
+          else if (w >= 640) row4.style.gridTemplateColumns = "1fr 1fr";
+          else row4.style.gridTemplateColumns = "1fr";
+        }
+
+        // Row 5: 2 cols on md+
+        if (row5) row5.style.gridTemplateColumns = w >= 768 ? "1fr 1fr" : "1fr";
+      }
+
+      applyLayout();
+      window.addEventListener("resize", applyLayout);
+    </script>
+  </body>
+</html>

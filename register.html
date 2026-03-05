@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Create Account</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #0D1117;
+      --paper:      #F7F4EF;
+      --sage:       #4A7C59;
+      --sage-light: #6BA37A;
+      --sage-dark:  #2F5C3A;
+      --sage-pale:  #E8F2EB;
+      --blush:      #E8927C;
+      --blush-pale: #FAF0ED;
+      --gold:       #C9A84C;
+      --gold-pale:  #FBF6E9;
+      --slate:      #8A9BB0;
+      --border:     rgba(13,17,23,0.1);
+    }
+
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); overflow: hidden; }
+
+    .wrapper { display: flex; height: 100vh; width: 100vw; }
+
+    /* ══ FORM PANEL ══ */
+    .form-panel {
+      width: 100%; max-width: 520px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      padding: 36px 48px;
+      overflow-y: auto; position: relative; z-index: 2;
+    }
+    .form-panel::-webkit-scrollbar { width: 4px; }
+    .form-panel::-webkit-scrollbar-thumb { background: #C8C4BC; border-radius: 100px; }
+
+    /* ══ LOGO ══ */
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
+    .logo-mark {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .logo-text { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--ink); line-height: 1; }
+    .logo-sub  { font-size: 11px; color: var(--slate); margin-top: 2px; }
+
+    /* ══ STEP INDICATOR ══ */
+    .steps {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 32px;
+    }
+    .step {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600;
+    }
+    .step-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step.active .step-num  { background: var(--sage); color: #fff; }
+    .step.active .step-label { color: var(--sage-dark); }
+    .step.done .step-num    { background: var(--sage-pale); color: var(--sage); }
+    .step.done .step-label  { color: var(--slate); }
+    .step.pending .step-num { background: #E8E4DC; color: var(--slate); }
+    .step.pending .step-label { color: var(--slate); }
+    .step-label { white-space: nowrap; }
+    .step-line { flex: 1; height: 1.5px; background: #E8E4DC; margin: 0 10px; }
+    .step-line.done { background: var(--sage); }
+
+    /* ══ FORM HEADER ══ */
+    .form-header { margin-bottom: 28px; }
+    .form-header h1 { font-family: 'DM Serif Display', serif; font-size: 30px; line-height: 1.2; color: var(--ink); }
+    .form-header h1 em { color: var(--sage); font-style: italic; }
+    .form-header p { font-size: 14px; color: var(--slate); margin-top: 8px; line-height: 1.6; }
+
+    /* ══ FIELDS ══ */
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+    .field-wrap { position: relative; }
+    .field-wrap i.field-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--slate); pointer-events: none; width: 16px; height: 16px;
+    }
+    .field-wrap input {
+      width: 100%; padding: 12px 14px 12px 42px;
+      font-size: 14px; font-family: 'DM Sans', sans-serif;
+      background: #fff; border: 1.5px solid var(--border);
+      border-radius: 12px; outline: none; color: var(--ink);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-wrap input:focus { border-color: var(--sage); box-shadow: 0 0 0 4px rgba(74,124,89,0.1); }
+    .field-wrap input::placeholder { color: #B0B8C4; }
+    .field-wrap input.no-icon { padding-left: 14px; }
+    .pwd-toggle {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--slate);
+      display: flex; align-items: center;
+    }
+    .pwd-toggle:hover { color: var(--ink); }
+
+    /* Password strength */
+    .pwd-strength { margin-top: 8px; }
+    .pwd-strength-bars { display: flex; gap: 4px; margin-bottom: 5px; }
+    .pwd-bar { flex: 1; height: 3px; background: #E8E4DC; border-radius: 100px; transition: background 0.2s; }
+    .pwd-label { font-size: 11px; color: var(--slate); }
+
+    /* Field error */
+    .field-error { font-size: 12px; color: #C05C3C; margin-top: 5px; display: none; }
+    .field.error .field-wrap input { border-color: #E8927C; }
+    .field.error .field-error { display: block; }
+
+    /* ══ TERMS ══ */
+    .terms {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: var(--slate); margin-bottom: 22px;
+      line-height: 1.5; cursor: pointer;
+    }
+    .terms input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--sage); margin-top: 1px; flex-shrink: 0; cursor: pointer; }
+    .terms a { color: var(--sage); font-weight: 600; text-decoration: none; }
+    .terms a:hover { color: var(--sage-dark); }
+
+    /* ══ SUBMIT ══ */
+    .btn-submit {
+      width: 100%; padding: 14px;
+      background: var(--sage); color: #fff;
+      font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+      border: none; border-radius: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .btn-submit:hover { background: var(--sage-dark); box-shadow: 0 6px 20px rgba(47,92,58,0.28); transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+
+    /* ══ DIVIDER ══ */
+    .divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; }
+    .divider-line { flex: 1; height: 1px; background: var(--border); }
+    .divider span { font-size: 12px; color: var(--slate); white-space: nowrap; }
+
+    /* ══ SSO ══ */
+    .sso-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-sso {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 14px; background: #fff;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--ink);
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-sso:hover { border-color: var(--sage); background: var(--sage-pale); }
+
+    /* ══ FOOTER ══ */
+    .form-footer { margin-top: 24px; text-align: center; font-size: 13px; color: var(--slate); }
+    .form-footer a { color: var(--sage); font-weight: 600; text-decoration: none; }
+    .form-footer a:hover { color: var(--sage-dark); }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .logo        { animation: fadeUp 0.4s ease 0.05s both; }
+    .steps       { animation: fadeUp 0.4s ease 0.08s both; }
+    .form-header { animation: fadeUp 0.4s ease 0.12s both; }
+    .field-row   { animation: fadeUp 0.4s ease 0.16s both; }
+    .f-email     { animation: fadeUp 0.4s ease 0.20s both; }
+    .f-password  { animation: fadeUp 0.4s ease 0.24s both; }
+    .terms       { animation: fadeUp 0.4s ease 0.28s both; }
+    .btn-submit  { animation: fadeUp 0.4s ease 0.32s both; }
+    .divider     { animation: fadeUp 0.4s ease 0.36s both; }
+    .sso-row     { animation: fadeUp 0.4s ease 0.40s both; }
+    .form-footer { animation: fadeUp 0.4s ease 0.44s both; }
+
+    /* ══ VISUAL PANEL ══ */
+    .visual-panel {
+      flex: 1;
+      background: linear-gradient(145deg, #0D1117 0%, #102015 40%, #1a3322 75%, #2F5C3A 100%);
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 52px;
+    }
+    .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.18; }
+    .blob-1 { width: 400px; height: 400px; background: #4A7C59; top: -100px; right: -80px; }
+    .blob-2 { width: 300px; height: 300px; background: #C9A84C; bottom: 80px; right: 60px; opacity: 0.12; }
+    .blob-3 { width: 200px; height: 200px; background: #E8927C; top: 40%; left: 10%; opacity: 0.1; }
+    .grid-overlay {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(74,124,89,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(74,124,89,0.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* How it works steps */
+    .how-steps { position: absolute; top: 52px; left: 52px; right: 52px; display: flex; flex-direction: column; gap: 0; }
+    .how-step {
+      display: flex; align-items: flex-start; gap: 16px;
+      opacity: 0; transform: translateY(14px);
+      animation: floatIn 0.5s ease forwards;
+    }
+    .how-step:nth-child(1) { animation-delay: 0.15s; }
+    .how-step:nth-child(2) { animation-delay: 0.3s; }
+    .how-step:nth-child(3) { animation-delay: 0.45s; }
+    .how-step:nth-child(4) { animation-delay: 0.6s; }
+    @keyframes floatIn { to { opacity: 1; transform: translateY(0); } }
+
+    .how-step-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding-top: 2px; }
+    .how-step-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .how-step-line { width: 1.5px; flex: 1; background: rgba(255,255,255,0.08); min-height: 28px; margin: 4px 0; }
+    .how-step-body { padding-bottom: 24px; }
+    .how-step-body h3 { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); margin-bottom: 3px; }
+    .how-step-body p  { font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.5; }
+
+    .visual-copy { position: relative; z-index: 1; }
+    .visual-copy h2 { font-family: 'DM Serif Display', serif; font-size: clamp(26px, 3vw, 42px); color: #fff; line-height: 1.2; margin-bottom: 14px; }
+    .visual-copy h2 em { color: var(--sage-light); font-style: italic; }
+    .visual-copy p { font-size: 14px; color: rgba(255,255,255,0.48); max-width: 440px; line-height: 1.7; margin-bottom: 28px; }
+
+    .clinic-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+    .pill { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 100px; font-size: 12px; color: rgba(255,255,255,0.65); }
+    .pill-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    .testimonial { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; max-width: 480px; }
+    .test-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--blush), #c97058); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.15); }
+    .test-quote  { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.5; }
+    .test-author { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+
+    @media (max-width: 900px) { .visual-panel { display: none; } .form-panel { max-width: 100%; padding: 32px 24px; } }
+    @media (max-width: 440px)  { .form-panel { padding: 24px 18px; } .field-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ══ FORM PANEL ══ -->
+  <div class="form-panel">
+
+    <!-- Logo -->
+    <div class="logo">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">MediCore</div>
+        <div class="logo-sub">Healthcare Management Platform</div>
+      </div>
+    </div>
+
+    <!-- Step indicator -->
+    <div class="steps">
+      <div class="step active">
+        <div class="step-num">1</div>
+        <span class="step-label">Your Account</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step pending">
+        <div class="step-num">2</div>
+        <span class="step-label">Clinic Setup</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="form-header">
+      <h1>Create your <em>account</em></h1>
+      <p>Set up your personal login. You'll add your clinic details next.</p>
+    </div>
+
+    <form id="register-form" onsubmit="handleSubmit(event)" autocomplete="off">
+
+      <!-- Name row -->
+      <div class="field-row">
+        <div class="field" id="field-fname">
+          <label for="fname">First name</label>
+          <div class="field-wrap">
+            <i data-lucide="user" class="field-icon"></i>
+            <input type="text" id="fname" placeholder="Adaeze" autocomplete="given-name"/>
+          </div>
+          <p class="field-error">Enter your first name.</p>
+        </div>
+        <div class="field" id="field-lname">
+          <label for="lname">Last name</label>
+          <div class="field-wrap">
+            <i data-lucide="user" class="field-icon"></i>
+            <input type="text" id="lname" placeholder="Obi" autocomplete="family-name"/>
+          </div>
+          <p class="field-error">Enter your last name.</p>
+        </div>
+      </div>
+
+      <!-- Email -->
+      <div class="field f-email" id="field-email">
+        <label for="email">Email address</label>
+        <div class="field-wrap">
+          <i data-lucide="mail" class="field-icon"></i>
+          <input type="email" id="email" placeholder="adaeze@yourname.ng" autocomplete="email"/>
+        </div>
+        <p class="field-error" id="email-error">Enter a valid email address.</p>
+      </div>
+
+      <!-- Password -->
+      <div class="field f-password" id="field-password">
+        <label for="password">Password</label>
+        <div class="field-wrap">
+          <i data-lucide="lock" class="field-icon"></i>
+          <input type="password" id="password" placeholder="Create a strong password" autocomplete="new-password" oninput="checkStrength(this.value)"/>
+          <button type="button" class="pwd-toggle" onclick="togglePwd()" title="Show/hide password">
+            <i data-lucide="eye" style="width:16px;height:16px;" id="pwd-icon"></i>
+          </button>
+        </div>
+        <!-- Password strength -->
+        <div class="pwd-strength" id="pwd-strength" style="display:none;">
+          <div class="pwd-strength-bars">
+            <div class="pwd-bar" id="bar1"></div>
+            <div class="pwd-bar" id="bar2"></div>
+            <div class="pwd-bar" id="bar3"></div>
+            <div class="pwd-bar" id="bar4"></div>
+          </div>
+          <p class="pwd-label" id="pwd-label">Weak</p>
+        </div>
+        <p class="field-error">Password must be at least 8 characters.</p>
+      </div>
+
+      <!-- Terms -->
+      <label class="terms">
+        <input type="checkbox" id="terms"/>
+        I agree to MediCore's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+      </label>
+
+      <!-- Submit -->
+      <button type="submit" class="btn-submit" id="submit-btn">
+        <span id="btn-text">Create account</span>
+        <svg id="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <div class="spinner" id="spinner"></div>
+      </button>
+
+    </form>
+
+    <!-- Divider -->
+    <div class="divider">
+      <div class="divider-line"></div>
+      <span>or sign up with</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <!-- SSO -->
+    <div class="sso-row">
+      <button class="btn-sso">
+        <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Google
+      </button>
+      <button class="btn-sso">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.43c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.54-1.32 3.06-2.53 3.96zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" fill="#0D1117"/>
+        </svg>
+        Apple
+      </button>
+    </div>
+
+    <div class="form-footer">
+      Already have an account? <a href="login.html">Sign in</a>
+    </div>
+
+  </div><!-- /form-panel -->
+
+  <!-- ══ VISUAL PANEL ══ -->
+  <div class="visual-panel">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="grid-overlay"></div>
+
+    <!-- How it works -->
+    <div class="how-steps">
+
+      <div class="how-step">
+        <div class="how-step-left">
+          <div class="how-step-icon" style="background:rgba(74,124,89,0.25);">
+            <i data-lucide="user-plus" style="width:17px;height:17px;color:#6BA37A;"></i>
+          </div>
+          <div class="how-step-line"></div>
+        </div>
+        <div class="how-step-body">
+          <h3>Create your account</h3>
+          <p>Set up your personal login credentials to get started with MediCore.</p>
+        </div>
+      </div>
+
+      <div class="how-step">
+        <div class="how-step-left">
+          <div class="how-step-icon" style="background:rgba(201,168,76,0.2);">
+            <i data-lucide="building-2" style="width:17px;height:17px;color:#C9A84C;"></i>
+          </div>
+          <div class="how-step-line"></div>
+        </div>
+        <div class="how-step-body">
+          <h3>Register your clinic</h3>
+          <p>Add your clinic name, location, and specialty so we can configure your workspace.</p>
+        </div>
+      </div>
+
+      <div class="how-step">
+        <div class="how-step-left">
+          <div class="how-step-icon" style="background:rgba(232,146,124,0.2);">
+            <i data-lucide="users" style="width:17px;height:17px;color:#E8927C;"></i>
+          </div>
+          <div class="how-step-line"></div>
+        </div>
+        <div class="how-step-body">
+          <h3>Invite your team</h3>
+          <p>Add doctors, nurses, and receptionists to your clinic's workspace.</p>
+        </div>
+      </div>
+
+      <div class="how-step">
+        <div class="how-step-left">
+          <div class="how-step-icon" style="background:rgba(74,124,89,0.25);">
+            <i data-lucide="rocket" style="width:17px;height:17px;color:#6BA37A;"></i>
+          </div>
+        </div>
+        <div class="how-step-body">
+          <h3>Go live in minutes</h3>
+          <p>Start booking appointments, managing records, and billing — all from one place.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom copy -->
+    <div class="visual-copy">
+      <div class="clinic-pills">
+        <div class="pill"><div class="pill-dot" style="background:#4A7C59;"></div>142 clinics onboarded</div>
+        <div class="pill"><div class="pill-dot" style="background:#C9A84C;"></div>Free 14-day trial</div>
+        <div class="pill"><div class="pill-dot" style="background:#E8927C;"></div>No credit card needed</div>
+      </div>
+      <h2>Your clinic,<br><em>fully digital</em> in minutes.</h2>
+      <p>Join over 140 clinics across Nigeria already streamlining their operations on MediCore.</p>
+      <div class="testimonial">
+        <div class="test-avatar">KA</div>
+        <div>
+          <div class="test-quote">"We went from paper records to a fully digital clinic in one afternoon. Setup was painless."</div>
+          <div class="test-author">Kemi Adeyemi — Admin, BrightMed Clinic, Ibadan</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /visual-panel -->
+
+</div>
+
+<script>
+  lucide.createIcons();
+
+  /* ── PASSWORD TOGGLE ── */
+  function togglePwd() {
+    const input = document.getElementById('password');
+    const icon  = document.getElementById('pwd-icon');
+    const show  = input.type === 'password';
+    input.type  = show ? 'text' : 'password';
+    icon.setAttribute('data-lucide', show ? 'eye-off' : 'eye');
+    lucide.createIcons();
+  }
+
+  /* ── PASSWORD STRENGTH ── */
+  function checkStrength(val) {
+    const wrap = document.getElementById('pwd-strength');
+    const label = document.getElementById('pwd-label');
+    const bars = [document.getElementById('bar1'), document.getElementById('bar2'), document.getElementById('bar3'), document.getElementById('bar4')];
+    if (!val) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    let score = 0;
+    if (val.length >= 8)  score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const colors = ['#E8927C','#C9A84C','#C9A84C','#4A7C59'];
+    const labels = ['Weak','Fair','Good','Strong'];
+    bars.forEach((b, i) => { b.style.background = i < score ? colors[score - 1] : '#E8E4DC'; });
+    label.textContent = labels[score - 1] || 'Weak';
+    label.style.color = colors[score - 1] || '#8A9BB0';
+  }
+
+  /* ── FORM SUBMIT ── */
+  function handleSubmit(e) {
+    e.preventDefault();
+    const fname = document.getElementById('fname').value.trim();
+    const lname = document.getElementById('lname').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const pwd   = document.getElementById('password').value;
+    const terms = document.getElementById('terms').checked;
+    let valid = true;
+
+    const setErr = (id, show) => document.getElementById(id).classList[show ? 'add' : 'remove']('error');
+
+    setErr('field-fname',   !fname);    if (!fname)   valid = false;
+    setErr('field-lname',   !lname);    if (!lname)   valid = false;
+    setErr('field-email',   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) valid = false;
+    setErr('field-password', pwd.length < 8); if (pwd.length < 8) valid = false;
+
+    if (!terms) { alert('Please agree to the Terms of Service to continue.'); valid = false; }
+    if (!valid) return;
+
+    const btn = document.getElementById('submit-btn');
+    const txt = document.getElementById('btn-text');
+    const arr = document.getElementById('btn-arrow');
+    const sp  = document.getElementById('spinner');
+    btn.disabled = true; btn.style.background = 'var(--sage-dark)';
+    txt.textContent = 'Creating account…'; arr.style.display = 'none'; sp.style.display = 'block';
+
+    setTimeout(() => {
+      txt.textContent = '✓ Account created — setting up your clinic…';
+      sp.style.display = 'none';
+      setTimeout(() => { window.location.href = 'register-clinic.html'; }, 800);
+    }, 1500);
+  }
+
+  /* ── Clear errors on input ── */
+  ['fname','lname','email','password'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      document.getElementById('field-' + id)?.classList.remove('error');
+    });
+  });
+</script>
+</body>
+</html>

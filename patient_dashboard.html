@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Patient Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"DM Serif Display"', 'serif'],
+            body:    ['"DM Sans"', 'sans-serif'],
+          },
+          colors: {
+            ink:          '#0D1117',
+            paper:        '#F7F4EF',
+            sage:         '#4A7C59',
+            'sage-light': '#6BA37A',
+            'sage-dark':  '#2F5C3A',
+            'sage-pale':  '#E8F2EB',
+            blush:        '#E8927C',
+            'blush-pale': '#FAF0ED',
+            slate:        '#8A9BB0',
+            'slate-light':'#EEF2F7',
+            gold:         '#C9A84C',
+            'gold-pale':  '#FBF6E9',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #F7F4EF; }
+
+    /* ══ LAYOUT ══ */
+    #app { display: flex; height: 100vh; overflow: hidden; position: relative; }
+
+    /* ══ SIDEBAR ══ */
+    #sidebar {
+      width: 260px; background: #0D1117;
+      display: flex; flex-direction: column;
+      flex-shrink: 0; height: 100vh;
+      overflow-y: auto;
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+      z-index: 50;
+    }
+    @media (max-width: 1023px) {
+      #sidebar { position: fixed; top: 0; left: 0; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+    }
+
+    /* ══ OVERLAY ══ */
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(13,17,23,0.5); backdrop-filter: blur(2px); z-index: 40; }
+    #overlay.show { display: block; }
+
+    /* ══ MAIN ══ */
+    #main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 80px; }
+    @media (min-width: 1024px) { #scroll-area { padding-bottom: 24px; } }
+
+    /* ══ NAV ITEMS ══ */
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 12px;
+      color: #8A9BB0; text-decoration: none; font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: rgba(74,124,89,0.15); color: #fff; }
+    .nav-item.active { background: rgba(74,124,89,0.22); color: #fff; border-left-color: #4A7C59; }
+
+    /* ══ CARDS ══ */
+    .card      { background: #fff; border: 1px solid #E8E4DC; border-radius: 16px; }
+    .card-sage { background: #4A7C59; border-radius: 16px; }
+    .card-blush{ background: #E8927C; border-radius: 16px; }
+    .card-ink  { background: #0D1117; border-radius: 16px; }
+    .card-gold { background: #C9A84C; border-radius: 16px; }
+
+    /* ══ STAT SCROLL ROW ══ */
+    .stat-row {
+      display: flex; gap: 14px;
+      overflow-x: auto; padding: 0 16px 4px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .stat-row::-webkit-scrollbar { display: none; }
+    .stat-snap { scroll-snap-align: start; flex: 0 0 75vw; max-width: 300px; }
+    @media (min-width: 640px) { .stat-snap { flex: 0 0 48%; } }
+    @media (min-width: 768px) {
+      .stat-row { display: grid; grid-template-columns: repeat(4,1fr); overflow: visible; padding: 0; }
+      .stat-snap { flex: none; max-width: none; }
+    }
+
+    /* ══ BADGES ══ */
+    .badge       { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; letter-spacing: 0.03em; white-space: nowrap; }
+    .b-scheduled { background: #E8F2EB; color: #2F5C3A; }
+    .b-upcoming  { background: #FBF6E9; color: #8B6A1A; }
+    .b-completed { background: #EEF2F7; color: #4A6580; }
+    .b-cancelled { background: #FAF0ED; color: #C05C3C; }
+    .b-unpaid    { background: #FAF0ED; color: #C05C3C; }
+    .b-paid      { background: #E8F2EB; color: #2F5C3A; }
+    .b-new       { background: #F5F0F8; color: #6A3D85; }
+    .b-normal    { background: #E8F2EB; color: #2F5C3A; }
+    .b-attention { background: #FAF0ED; color: #C05C3C; }
+
+    /* ══ AVATAR ══ */
+    .av { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+
+    /* ══ PROGRESS ══ */
+    .prog      { height: 6px; background: #E8E4DC; border-radius: 100px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 100px; }
+
+    /* ══ SCROLLBARS ══ */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C8C4BC; border-radius: 100px; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .fu { animation: fadeUp 0.4s ease forwards; }
+    .d1{animation-delay:.04s;opacity:0} .d2{animation-delay:.08s;opacity:0}
+    .d3{animation-delay:.12s;opacity:0} .d4{animation-delay:.16s;opacity:0}
+
+    @keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
+    .pdot { animation: pdot 2s infinite; }
+
+    /* ══ BOTTOM NAV ══ */
+    #bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0D1117; border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex; z-index: 45;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 1024px) { #bottom-nav { display: none; } }
+    #bottom-nav a {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 10px 4px 8px; color: #8A9BB0; font-size: 10px;
+      text-decoration: none; transition: color 0.15s;
+    }
+    #bottom-nav a.active, #bottom-nav a:hover { color: #4A7C59; }
+
+    /* ══ TABLE WRAP ══ */
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tbl-wrap table { min-width: 520px; }
+
+    /* ══ HERO BANNER ══ */
+    .hero-banner {
+      background: linear-gradient(135deg, #0D1117 0%, #1a2d22 60%, #2F5C3A 100%);
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-banner::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 200px; height: 200px;
+      background: rgba(74,124,89,0.2);
+      border-radius: 50%;
+    }
+    .hero-banner::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; right: 80px;
+      width: 140px; height: 140px;
+      background: rgba(74,124,89,0.12);
+      border-radius: 50%;
+    }
+
+    /* ══ UPCOMING APPT CARD ══ */
+    .appt-card {
+      background: linear-gradient(135deg, #4A7C59, #2F5C3A);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .appt-card::after {
+      content: '';
+      position: absolute;
+      top: -30px; right: -30px;
+      width: 120px; height: 120px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 50%;
+    }
+
+    /* ══ VITAL CARD ══ */
+    .vital-chip {
+      display: flex; flex-direction: column;
+      padding: 14px 16px;
+      background: #fff;
+      border: 1px solid #E8E4DC;
+      border-radius: 14px;
+      gap: 6px;
+    }
+    .vital-chip.alert { border-color: #E8927C; background: #FAF0ED; }
+
+    /* ══ MSG BUBBLE ══ */
+    .msg { padding: 10px 14px; border-radius: 14px; font-size: 13px; max-width: 82%; line-height: 1.5; }
+    .msg-in  { background: #fff; border: 1px solid #E8E4DC; color: #0D1117; border-bottom-left-radius: 4px; }
+    .msg-out { background: #4A7C59; color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
+
+    @media (min-width: 1024px) { #ham-btn { display: none !important; } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ OVERLAY ══ -->
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+  <aside id="sidebar">
+
+    <!-- Logo -->
+    <div style="padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:#4A7C59;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="activity" style="width:18px;height:18px;color:#fff;"></i>
+        </div>
+        <div>
+          <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1;">MediCore</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:2px;">Patient Portal</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#8A9BB0;background:rgba(255,255,255,0.06);border:none;border-radius:8px;cursor:pointer;">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+
+    <!-- Patient identity -->
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.05);border-radius:12px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#6BA37A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;flex-shrink:0;border:2px solid rgba(255,255,255,0.15);">CE</div>
+        <div style="flex:1;min-width:0;">
+          <p style="color:#fff;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chioma Eze</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:2px;">P-00421 · 29F · Blood Group A+</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav style="flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:2px;">
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:0 12px 8px;">My Health</p>
+      <a href="#" class="nav-item active"><i data-lucide="layout-dashboard" style="width:17px;height:17px;flex-shrink:0;"></i>Overview</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="calendar-days" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">My Appointments</span>
+        <span style="font-size:11px;background:#4A7C59;color:#fff;padding:2px 8px;border-radius:20px;">1</span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="file-heart" style="width:17px;height:17px;flex-shrink:0;"></i>Medical Records</a>
+      <a href="#" class="nav-item"><i data-lucide="pill" style="width:17px;height:17px;flex-shrink:0;"></i>Prescriptions</a>
+      <a href="#" class="nav-item"><i data-lucide="flask-conical" style="width:17px;height:17px;flex-shrink:0;"></i>Lab Results</a>
+      <a href="#" class="nav-item"><i data-lucide="scan-heart" style="width:17px;height:17px;flex-shrink:0;"></i>Vitals & History</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">Services</p>
+      <a href="#" class="nav-item"><i data-lucide="calendar-plus" style="width:17px;height:17px;flex-shrink:0;"></i>Book Appointment</a>
+      <a href="#" class="nav-item" style="justify-content:flex-start;">
+        <i data-lucide="message-circle" style="width:17px;height:17px;flex-shrink:0;"></i>
+        <span style="flex:1;">Messages</span>
+        <span style="font-size:11px;background:#E8927C;color:#fff;padding:2px 8px;border-radius:20px;">2</span>
+      </a>
+      <a href="#" class="nav-item"><i data-lucide="receipt" style="width:17px;height:17px;flex-shrink:0;"></i>Bills & Payments</a>
+      <a href="#" class="nav-item"><i data-lucide="download" style="width:17px;height:17px;flex-shrink:0;"></i>Download Reports</a>
+
+      <p style="font-size:10px;font-weight:600;color:rgba(138,155,176,0.6);text-transform:uppercase;letter-spacing:0.1em;padding:16px 12px 8px;">Account</p>
+      <a href="#" class="nav-item"><i data-lucide="user-circle" style="width:17px;height:17px;flex-shrink:0;"></i>My Profile</a>
+      <a href="#" class="nav-item"><i data-lucide="shield" style="width:17px;height:17px;flex-shrink:0;"></i>Insurance</a>
+      <a href="#" class="nav-item"><i data-lucide="settings" style="width:17px;height:17px;flex-shrink:0;"></i>Settings</a>
+
+    </nav>
+
+    <!-- Footer -->
+    <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#6BA37A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">CE</div>
+      <div style="flex:1;min-width:0;">
+        <p style="color:#fff;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chioma Eze</p>
+        <p style="color:#8A9BB0;font-size:11px;">Grace Health Clinic</p>
+      </div>
+      <button style="background:none;border:none;color:#8A9BB0;cursor:pointer;padding:4px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#8A9BB0'">
+        <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════ MAIN ══════════════════════ -->
+  <div id="main">
+
+    <!-- TOP BAR -->
+    <header style="background:rgba(247,244,239,0.95);backdrop-filter:blur(8px);border-bottom:1px solid rgba(13,17,23,0.1);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;flex-shrink:0;">
+
+      <button id="ham-btn" onclick="openSidebar()" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;flex-shrink:0;">
+        <i data-lucide="menu" style="width:17px;height:17px;color:#0D1117;"></i>
+      </button>
+
+      <div style="flex:1;min-width:0;">
+        <h1 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:clamp(16px,3vw,22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          Hello, Chioma <span style="color:#4A7C59;font-style:italic;">✦</span>
+        </h1>
+        <p style="color:#8A9BB0;font-size:12px;display:none;" id="date-sub">Thursday, 5 March 2026 · Grace Health Clinic</p>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <!-- Notification -->
+        <button style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(13,17,23,0.1);border-radius:10px;cursor:pointer;">
+          <i data-lucide="bell" style="width:17px;height:17px;color:#0D1117;"></i>
+          <span style="position:absolute;top:8px;right:8px;width:7px;height:7px;background:#E8927C;border-radius:50%;"></span>
+        </button>
+        <!-- Book appointment CTA -->
+        <button style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#4A7C59;color:#fff;font-size:13px;font-weight:500;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">
+          <i data-lucide="calendar-plus" style="width:15px;height:15px;"></i>
+          <span id="cta-label">Book Appointment</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══ SCROLL AREA ══ -->
+    <div id="scroll-area">
+
+      <!-- ── HERO BANNER ── -->
+      <div class="fu d1" style="padding:20px 16px 0;">
+        <div class="hero-banner" style="padding:24px;">
+          <div style="position:relative;z-index:1;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <!-- Avatar -->
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#6BA37A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;flex-shrink:0;border:3px solid rgba(255,255,255,0.2);">CE</div>
+            <div style="flex:1;min-width:0;">
+              <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:22px;line-height:1.2;">Chioma Eze</p>
+              <p style="color:rgba(255,255,255,0.55);font-size:13px;margin-top:4px;">Patient ID: P-00421 &nbsp;·&nbsp; Blood Group: A+ &nbsp;·&nbsp; Age: 29</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;">
+              <div style="padding:8px 14px;background:rgba(255,255,255,0.08);border-radius:10px;border:1px solid rgba(255,255,255,0.12);text-align:center;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;">Doctor</p>
+                <p style="font-size:13px;font-weight:600;color:#fff;margin-top:2px;">Dr. Bello</p>
+              </div>
+              <div style="padding:8px 14px;background:rgba(255,255,255,0.08);border-radius:10px;border:1px solid rgba(255,255,255,0.12);text-align:center;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;">Last Visit</p>
+                <p style="font-size:13px;font-weight:600;color:#fff;margin-top:2px;">4 Feb 2026</p>
+              </div>
+              <div style="padding:8px 14px;background:rgba(255,255,255,0.08);border-radius:10px;border:1px solid rgba(255,255,255,0.12);text-align:center;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;">Next Appt</p>
+                <p style="font-size:13px;font-weight:600;color:#4A7C59;margin-top:2px;">Today 09:00</p>
+              </div>
+            </div>
+          </div>
+          <!-- Allergy / condition chips -->
+          <div style="position:relative;z-index:1;display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+            <span style="font-size:11px;background:rgba(232,146,124,0.25);color:#F0A898;padding:4px 12px;border-radius:20px;border:1px solid rgba(232,146,124,0.3);font-weight:500;">⚠ Allergy: Penicillin</span>
+            <span style="font-size:11px;background:rgba(74,124,89,0.2);color:#6BA37A;padding:4px 12px;border-radius:20px;border:1px solid rgba(74,124,89,0.25);font-weight:500;">Hypertension</span>
+            <span style="font-size:11px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);padding:4px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);font-weight:500;">No surgery history</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STAT CARDS ── -->
+      <div class="fu d1" style="padding:16px 0 4px;">
+        <div class="stat-row">
+
+          <!-- Upcoming Appointment -->
+          <div class="stat-snap" style="padding:20px;background:linear-gradient(135deg,#4A7C59,#2F5C3A);border-radius:16px;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
+            <div style="position:relative;z-index:1;">
+              <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Next Appointment</p>
+              <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:20px;margin-top:8px;line-height:1.2;">Today, 09:00 AM</p>
+              <p style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px;">Dr. Bello · Gen. Practice · Room 3</p>
+              <button style="margin-top:14px;font-size:12px;background:rgba(255,255,255,0.15);color:#fff;padding:7px 14px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+                <i data-lucide="map-pin" style="width:13px;height:13px;"></i> Get Directions
+              </button>
+            </div>
+          </div>
+
+          <!-- Outstanding Bill -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Outstanding Bill</p>
+                <p style="font-family:'DM Serif Display',serif;color:#E8927C;font-size:36px;margin-top:6px;line-height:1;">₦12,500</p>
+                <p style="color:#8A9BB0;font-size:12px;margin-top:4px;">INV-2841 · Due: 10 Mar</p>
+              </div>
+              <div style="width:40px;height:40px;background:#FAF0ED;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="receipt" style="width:20px;height:20px;color:#E8927C;"></i>
+              </div>
+            </div>
+            <button style="margin-top:14px;width:100%;font-size:13px;font-weight:600;background:#E8927C;color:#fff;padding:9px;border:none;border-radius:10px;cursor:pointer;" onmouseover="this.style.background='#d07a65'" onmouseout="this.style.background='#E8927C'">Pay Now</button>
+          </div>
+
+          <!-- Active Prescriptions -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Active Prescriptions</p>
+                <p style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:38px;margin-top:6px;line-height:1;">2</p>
+                <p style="color:#4A7C59;font-size:12px;margin-top:4px;">Refill due in 12 days</p>
+              </div>
+              <div style="width:40px;height:40px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="pill" style="width:20px;height:20px;color:#4A7C59;"></i>
+              </div>
+            </div>
+            <button style="margin-top:14px;font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;">
+              View prescriptions <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+          <!-- Pending Lab Results -->
+          <div class="stat-snap card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <p style="color:#8A9BB0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Lab Results</p>
+                <p style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:38px;margin-top:6px;line-height:1;">1</p>
+                <p style="color:#C9A84C;font-size:12px;margin-top:4px;">New result ready</p>
+              </div>
+              <div style="width:40px;height:40px;background:#FBF6E9;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i data-lucide="flask-conical" style="width:20px;height:20px;color:#C9A84C;"></i>
+              </div>
+            </div>
+            <button style="margin-top:14px;font-size:12px;color:#C9A84C;font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;">
+              View results <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+
+        </div>
+        <p style="text-align:center;font-size:11px;color:rgba(138,155,176,0.5);padding:4px 0 0;" id="swipe-hint">← swipe for more →</p>
+      </div>
+
+      <!-- PADDED CONTENT -->
+      <div style="padding:0 16px 16px;" id="padded-content">
+
+        <!-- ── ROW 2: Vitals + Appointments ── -->
+        <div class="fu d2" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;" id="row2">
+
+          <!-- My Vitals -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+              <div>
+                <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">My Vitals</h2>
+                <p style="color:#8A9BB0;font-size:13px;margin-top:2px;">Last recorded: 4 Feb 2026</p>
+              </div>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">History</button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;" id="vitals-grid">
+
+              <div class="vital-chip alert">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <p style="font-size:11px;color:#E8927C;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Blood Pressure</p>
+                  <span class="badge b-attention">High</span>
+                </div>
+                <p style="font-family:'DM Serif Display',serif;font-size:26px;color:#0D1117;line-height:1;">148<span style="font-size:14px;font-weight:400;color:#8A9BB0;">/92</span></p>
+                <p style="font-size:11px;color:#E8927C;">↑ Above normal range</p>
+              </div>
+
+              <div class="vital-chip">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <p style="font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Heart Rate</p>
+                  <span class="badge b-normal">Normal</span>
+                </div>
+                <p style="font-family:'DM Serif Display',serif;font-size:26px;color:#0D1117;line-height:1;">88<span style="font-size:14px;font-weight:400;color:#8A9BB0;"> bpm</span></p>
+                <p style="font-size:11px;color:#4A7C59;">Within normal range</p>
+              </div>
+
+              <div class="vital-chip">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <p style="font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Temperature</p>
+                  <span class="badge b-normal">Normal</span>
+                </div>
+                <p style="font-family:'DM Serif Display',serif;font-size:26px;color:#0D1117;line-height:1;">37.1<span style="font-size:14px;font-weight:400;color:#8A9BB0;">°C</span></p>
+                <p style="font-size:11px;color:#4A7C59;">Normal range</p>
+              </div>
+
+              <div class="vital-chip">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <p style="font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Weight / BMI</p>
+                  <span class="badge b-normal">Good</span>
+                </div>
+                <p style="font-family:'DM Serif Display',serif;font-size:26px;color:#0D1117;line-height:1;">68<span style="font-size:14px;font-weight:400;color:#8A9BB0;"> kg</span></p>
+                <p style="font-size:11px;color:#4A7C59;">BMI: 23.4 · Healthy</p>
+              </div>
+
+              <div class="vital-chip">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <p style="font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Blood Sugar</p>
+                  <span class="badge b-normal">Normal</span>
+                </div>
+                <p style="font-family:'DM Serif Display',serif;font-size:26px;color:#0D1117;line-height:1;">5.4<span style="font-size:14px;font-weight:400;color:#8A9BB0;"> mmol/L</span></p>
+                <p style="font-size:11px;color:#4A7C59;">Fasting: Normal</p>
+              </div>
+
+              <div class="vital-chip">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <p style="font-size:11px;color:#8A9BB0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">SpO₂</p>
+                  <span class="badge b-normal">Normal</span>
+                </div>
+                <p style="font-family:'DM Serif Display',serif;font-size:26px;color:#0D1117;line-height:1;">98<span style="font-size:14px;font-weight:400;color:#8A9BB0;">%</span></p>
+                <p style="font-size:11px;color:#4A7C59;">Oxygen saturation OK</p>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Right panel: Upcoming appointments + quick actions -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+
+            <!-- Upcoming Appointments -->
+            <div class="card" style="padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">My Appointments</h2>
+                <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">Book new</button>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;">
+
+                <!-- Today - active -->
+                <div style="padding:14px;background:#E8F2EB;border-radius:12px;border:1.5px solid #4A7C59;">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+                    <div style="flex:1;min-width:0;">
+                      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                        <span class="pdot" style="width:7px;height:7px;background:#4A7C59;border-radius:50%;display:inline-block;"></span>
+                        <p style="font-size:11px;color:#4A7C59;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Today · 09:00 AM</p>
+                      </div>
+                      <p style="font-size:14px;font-weight:600;color:#0D1117;">Hypertension Follow-up</p>
+                      <p style="font-size:12px;color:#8A9BB0;margin-top:2px;">Dr. Bello · Gen. Practice · Room 3</p>
+                    </div>
+                    <span class="badge b-scheduled" style="flex-shrink:0;">Confirmed</span>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button style="flex:1;font-size:12px;font-weight:600;background:#4A7C59;color:#fff;padding:7px;border:none;border-radius:8px;cursor:pointer;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">Get Directions</button>
+                    <button style="font-size:12px;font-weight:500;color:#E8927C;background:#FAF0ED;padding:7px 12px;border:none;border-radius:8px;cursor:pointer;">Reschedule</button>
+                  </div>
+                </div>
+
+                <!-- Upcoming -->
+                <div style="padding:12px 14px;background:#fff;border-radius:12px;border:1px solid #E8E4DC;">
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:40px;height:40px;background:#EEF2F7;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <i data-lucide="calendar" style="width:18px;height:18px;color:#8A9BB0;"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:14px;font-weight:500;color:#0D1117;">Blood Pressure Review</p>
+                      <p style="font-size:12px;color:#8A9BB0;margin-top:1px;">Dr. Bello · 12 March 2026 · 10:00 AM</p>
+                    </div>
+                    <span class="badge b-upcoming" style="flex-shrink:0;">Upcoming</span>
+                  </div>
+                </div>
+
+                <!-- Past -->
+                <div style="padding:12px 14px;background:#F9F8F6;border-radius:12px;border:1px solid #E8E4DC;opacity:0.7;">
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:40px;height:40px;background:#EEF2F7;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <i data-lucide="check-circle" style="width:18px;height:18px;color:#8A9BB0;"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <p style="font-size:14px;font-weight:500;color:#8A9BB0;">Initial Consultation</p>
+                      <p style="font-size:12px;color:#8A9BB0;margin-top:1px;">Dr. Bello · 4 Feb 2026 · Completed</p>
+                    </div>
+                    <button style="font-size:11px;color:#4A7C59;font-weight:600;background:#E8F2EB;padding:4px 10px;border:none;border-radius:6px;cursor:pointer;flex-shrink:0;">Notes</button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card" style="padding:20px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;margin-bottom:14px;">Quick Actions</h2>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#E8F2EB;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#4A7C59';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#E8F2EB';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="calendar-plus" style="width:20px;height:20px;color:#4A7C59;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#4A7C59;text-align:center;line-height:1.3;">Book Appt</span>
+                </button>
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#FAF0ED;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#E8927C';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#FAF0ED';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="message-circle" style="width:20px;height:20px;color:#E8927C;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#E8927C;text-align:center;line-height:1.3;">Message Doctor</span>
+                </button>
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#FBF6E9;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#C9A84C';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#FBF6E9';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="download" style="width:20px;height:20px;color:#C9A84C;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#C9A84C;text-align:center;line-height:1.3;">Download Report</span>
+                </button>
+                <button style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:#EEF2F7;border:none;border-radius:12px;cursor:pointer;" onmouseover="this.style.background='#0D1117';this.querySelectorAll('*').forEach(e=>{e.style.color='#fff'})" onmouseout="this.style.background='#EEF2F7';this.querySelectorAll('*').forEach(e=>{e.style.color=''})">
+                  <i data-lucide="receipt" style="width:20px;height:20px;color:#0D1117;"></i>
+                  <span style="font-size:12px;font-weight:500;color:#0D1117;text-align:center;line-height:1.3;">Pay Bill</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div><!-- /row2 -->
+
+        <!-- ── ROW 3: Prescriptions + Lab Results ── -->
+        <div class="fu d3" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;" id="row3">
+
+          <!-- Active Prescriptions -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">My Prescriptions</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">View all</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;">
+
+              <!-- Active prescription -->
+              <div style="padding:14px;background:#E8F2EB;border-radius:12px;border:1px solid rgba(74,124,89,0.25);">
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  <div style="width:40px;height:40px;background:#4A7C59;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="pill" style="width:18px;height:18px;color:#fff;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                      <p style="font-size:14px;font-weight:600;color:#0D1117;">Amlodipine 5mg</p>
+                      <span class="badge b-scheduled">Active</span>
+                    </div>
+                    <p style="font-size:12px;color:#4A7C59;margin-top:3px;">Once daily · Morning after food</p>
+                    <p style="font-size:12px;color:#8A9BB0;margin-top:2px;">Dr. Bello · 30 day supply · Refill in 12 days</p>
+                    <div class="prog" style="margin-top:10px;">
+                      <div class="prog-fill" style="width:60%;background:#4A7C59;"></div>
+                    </div>
+                    <p style="font-size:11px;color:#8A9BB0;margin-top:4px;">18 of 30 days remaining</p>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                  <button style="flex:1;font-size:12px;font-weight:600;background:#4A7C59;color:#fff;padding:7px;border:none;border-radius:8px;cursor:pointer;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">Request Refill</button>
+                  <button style="font-size:12px;font-weight:500;color:#4A7C59;background:#fff;padding:7px 12px;border:1px solid rgba(74,124,89,0.3);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                    <i data-lucide="download" style="width:13px;height:13px;"></i> Download
+                  </button>
+                </div>
+              </div>
+
+              <!-- Active prescription 2 -->
+              <div style="padding:14px;background:#fff;border-radius:12px;border:1px solid #E8E4DC;">
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  <div style="width:40px;height:40px;background:#EEF2F7;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="pill" style="width:18px;height:18px;color:#8A9BB0;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                      <p style="font-size:14px;font-weight:600;color:#0D1117;">Hydrochlorothiazide 25mg</p>
+                      <span class="badge b-scheduled">Active</span>
+                    </div>
+                    <p style="font-size:12px;color:#4A7C59;margin-top:3px;">Once daily · Morning</p>
+                    <p style="font-size:12px;color:#8A9BB0;margin-top:2px;">Dr. Bello · 60 day supply · Refill in 28 days</p>
+                    <div class="prog" style="margin-top:10px;">
+                      <div class="prog-fill" style="width:53%;background:#8A9BB0;"></div>
+                    </div>
+                    <p style="font-size:11px;color:#8A9BB0;margin-top:4px;">32 of 60 days remaining</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Past prescription -->
+              <div style="padding:14px;background:#F9F8F6;border-radius:12px;border:1px solid #E8E4DC;opacity:0.65;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="width:40px;height:40px;background:#EEF2F7;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="pill" style="width:18px;height:18px;color:#8A9BB0;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                      <p style="font-size:14px;font-weight:500;color:#8A9BB0;">Amoxicillin 500mg</p>
+                      <span class="badge b-completed">Completed</span>
+                    </div>
+                    <p style="font-size:12px;color:#8A9BB0;margin-top:3px;">Thrice daily · 7 day course · Completed Jan 2026</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Lab Results -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Lab Results</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">All results</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;">
+
+              <!-- New result - highlight -->
+              <div style="padding:14px;background:#FBF6E9;border-radius:12px;border:1.5px solid #C9A84C;">
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  <div style="width:40px;height:40px;background:#C9A84C;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="flask-conical" style="width:18px;height:18px;color:#fff;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                      <p style="font-size:14px;font-weight:600;color:#0D1117;">Full Blood Count (FBC)</p>
+                      <span style="font-size:11px;background:#C9A84C;color:#fff;padding:3px 10px;border-radius:100px;font-weight:600;flex-shrink:0;">New</span>
+                    </div>
+                    <p style="font-size:12px;color:#8A9BB0;margin-top:3px;">Requested by Dr. Bello · 4 Mar 2026</p>
+                    <p style="font-size:12px;color:#C9A84C;margin-top:4px;font-weight:500;">Result ready — tap to view</p>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                  <button style="flex:1;font-size:12px;font-weight:600;background:#C9A84C;color:#fff;padding:7px;border:none;border-radius:8px;cursor:pointer;" onmouseover="this.style.background='#a88a36'" onmouseout="this.style.background='#C9A84C'">View Result</button>
+                  <button style="font-size:12px;font-weight:500;color:#C9A84C;background:#fff;padding:7px 12px;border:1px solid rgba(201,168,76,0.3);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                    <i data-lucide="download" style="width:13px;height:13px;"></i> PDF
+                  </button>
+                </div>
+              </div>
+
+              <!-- Previous result -->
+              <div style="padding:14px;background:#fff;border-radius:12px;border:1px solid #E8E4DC;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="width:40px;height:40px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="flask-conical" style="width:18px;height:18px;color:#4A7C59;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                      <p style="font-size:14px;font-weight:500;color:#0D1117;">Urinalysis</p>
+                      <span class="badge b-normal">Normal</span>
+                    </div>
+                    <p style="font-size:12px;color:#8A9BB0;margin-top:3px;">Dr. Bello · 4 Feb 2026 · All values normal</p>
+                  </div>
+                  <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;">
+                    <i data-lucide="download" style="width:15px;height:15px;"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Previous result 2 -->
+              <div style="padding:14px;background:#fff;border-radius:12px;border:1px solid #E8E4DC;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="width:40px;height:40px;background:#FAF0ED;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="flask-conical" style="width:18px;height:18px;color:#E8927C;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                      <p style="font-size:14px;font-weight:500;color:#0D1117;">Lipid Panel</p>
+                      <span class="badge b-attention">Elevated LDL</span>
+                    </div>
+                    <p style="font-size:12px;color:#8A9BB0;margin-top:3px;">Dr. Bello · 10 Jan 2026 · Review needed</p>
+                  </div>
+                  <button style="background:none;border:none;cursor:pointer;color:#8A9BB0;flex-shrink:0;">
+                    <i data-lucide="download" style="width:15px;height:15px;"></i>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div><!-- /row3 -->
+
+        <!-- ── ROW 4: Messages + Visit History + Bills ── -->
+        <div class="fu d4" style="display:grid;grid-template-columns:1fr;gap:16px;" id="row4">
+
+          <!-- Secure Messages -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div>
+                <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Messages</h2>
+                <p style="color:#8A9BB0;font-size:13px;margin-top:2px;">Secure chat with your care team</p>
+              </div>
+              <span style="font-size:11px;background:#FAF0ED;color:#C05C3C;padding:3px 10px;border-radius:100px;font-weight:600;">2 Unread</span>
+            </div>
+
+            <!-- Chat preview -->
+            <div style="background:#F7F4EF;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;max-height:220px;overflow-y:auto;">
+
+              <!-- Incoming -->
+              <div style="display:flex;gap:8px;align-items:flex-end;">
+                <div class="av" style="background:#4A7C59;color:#fff;font-size:10px;width:28px;height:28px;margin-bottom:0;flex-shrink:0;">DB</div>
+                <div>
+                  <p style="font-size:10px;color:#8A9BB0;margin-bottom:3px;">Dr. Bello · 08:30 AM</p>
+                  <div class="msg msg-in">Hello Chioma, just a reminder that your appointment is at 9 AM today. Please arrive 10 minutes early.</div>
+                </div>
+              </div>
+
+              <!-- Outgoing -->
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                <p style="font-size:10px;color:#8A9BB0;margin-bottom:3px;">You · 08:45 AM</p>
+                <div class="msg msg-out">Thank you, Doctor! I'll be there.</div>
+              </div>
+
+              <!-- Incoming - unread -->
+              <div style="display:flex;gap:8px;align-items:flex-end;">
+                <div class="av" style="background:#4A7C59;color:#fff;font-size:10px;width:28px;height:28px;flex-shrink:0;">DB</div>
+                <div>
+                  <p style="font-size:10px;color:#8A9BB0;margin-bottom:3px;">Dr. Bello · 09:42 AM</p>
+                  <div class="msg msg-in" style="border-color:#4A7C59;background:#E8F2EB;">
+                    Your FBC results are ready. Your haemoglobin is normal. Blood pressure still elevated — we'll discuss management today.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Message input -->
+            <div style="display:flex;gap:8px;">
+              <input type="text" placeholder="Type a message…" style="flex:1;padding:10px 14px;font-size:13px;background:#fff;border:1px solid rgba(13,17,23,0.12);border-radius:10px;outline:none;font-family:'DM Sans',sans-serif;" onfocus="this.style.borderColor='#4A7C59'" onblur="this.style.borderColor='rgba(13,17,23,0.12)'"/>
+              <button style="width:40px;height:40px;background:#4A7C59;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" onmouseover="this.style.background='#2F5C3A'" onmouseout="this.style.background='#4A7C59'">
+                <i data-lucide="send" style="width:16px;height:16px;color:#fff;"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Visit History -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Visit History</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">Full history</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0;">
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="stethoscope" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Initial Consultation</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Dr. Bello · Hypertension diagnosed</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">4 Feb 2026</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#FBF6E9;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="flask-conical" style="width:13px;height:13px;color:#C9A84C;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Lab Tests Done</p>
+                  <p style="font-size:12px;color:#8A9BB0;">FBC, Lipid Panel, Urinalysis</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">4 Feb 2026</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="pill" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                  <div style="width:1px;flex:1;background:rgba(13,17,23,0.1);min-height:20px;"></div>
+                </div>
+                <div style="padding-bottom:14px;">
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Medication started</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Amlodipine 5mg + HCTZ 25mg</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">5 Feb 2026</p>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:28px;height:28px;background:#E8F2EB;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="calendar-check" style="width:13px;height:13px;color:#4A7C59;"></i></div>
+                </div>
+                <div>
+                  <p style="font-size:14px;font-weight:500;color:#0D1117;">Follow-up scheduled</p>
+                  <p style="font-size:12px;color:#8A9BB0;">Today — BP monitoring review</p>
+                  <p style="font-size:11px;color:rgba(138,155,176,0.6);margin-top:2px;">5 Mar 2026 · 09:00 AM</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Bills & Payments -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-family:'DM Serif Display',serif;color:#0D1117;font-size:18px;">Bills & Payments</h2>
+              <button style="font-size:12px;color:#4A7C59;font-weight:600;background:none;border:none;cursor:pointer;">All bills</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+
+              <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#FAF0ED;border-radius:10px;border-left:3px solid #E8927C;">
+                <div style="width:36px;height:36px;background:#E8927C;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="receipt" style="width:15px;height:15px;color:#fff;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:#0D1117;">Consultation + Lab</p>
+                  <p style="font-size:11px;color:#8A9BB0;">INV-2841 · Due: 10 Mar 2026</p>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <p style="font-size:14px;font-weight:700;color:#E8927C;">₦12,500</p>
+                  <span class="badge b-unpaid">Unpaid</span>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:36px;height:36px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="check-circle" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;">Registration fee</p>
+                  <p style="font-size:11px;color:#8A9BB0;">INV-2801 · Paid 4 Feb 2026</p>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <p style="font-size:14px;font-weight:600;color:#8A9BB0;">₦5,000</p>
+                  <span class="badge b-paid">Paid</span>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;" onmouseover="this.style.background='#F7F4EF'" onmouseout="this.style.background='transparent'">
+                <div style="width:36px;height:36px;background:#E8F2EB;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="check-circle" style="width:15px;height:15px;color:#4A7C59;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:500;color:#0D1117;">Lab tests (FBC, Lipid, UA)</p>
+                  <p style="font-size:11px;color:#8A9BB0;">INV-2804 · Paid 5 Feb 2026</p>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <p style="font-size:14px;font-weight:600;color:#8A9BB0;">₦18,000</p>
+                  <span class="badge b-paid">Paid</span>
+                </div>
+              </div>
+
+            </div>
+
+            <button style="margin-top:14px;width:100%;font-size:13px;font-weight:600;background:#E8927C;color:#fff;padding:11px;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onmouseover="this.style.background='#d07a65'" onmouseout="this.style.background='#E8927C'">
+              <i data-lucide="credit-card" style="width:15px;height:15px;"></i>
+              Pay Outstanding · ₦12,500
+            </button>
+          </div>
+
+        </div><!-- /row4 -->
+
+      </div><!-- /padded-content -->
+    </div><!-- /scroll-area -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ══ BOTTOM NAV (mobile) ══ -->
+<nav id="bottom-nav">
+  <a href="#" class="active">
+    <i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i>
+    <span>Home</span>
+  </a>
+  <a href="#">
+    <i data-lucide="calendar-days" style="width:20px;height:20px;"></i>
+    <span>Appts</span>
+  </a>
+  <a href="#">
+    <i data-lucide="file-heart" style="width:20px;height:20px;"></i>
+    <span>Records</span>
+  </a>
+  <a href="#">
+    <i data-lucide="message-circle" style="width:20px;height:20px;"></i>
+    <span>Messages</span>
+  </a>
+  <a href="#">
+    <i data-lucide="receipt" style="width:20px;height:20px;"></i>
+    <span>Bills</span>
+  </a>
+</nav>
+
+<script>
+  lucide.createIcons();
+
+  function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('overlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+    document.body.style.overflow = '';
+  }
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 1024) closeSidebar();
+  });
+
+  function applyLayout() {
+    const w = window.innerWidth;
+    const row2 = document.getElementById('row2');
+    const row3 = document.getElementById('row3');
+    const row4 = document.getElementById('row4');
+    const vitalsGrid = document.getElementById('vitals-grid');
+    const dateSub   = document.getElementById('date-sub');
+    const ctaLabel  = document.getElementById('cta-label');
+    const swipeHint = document.getElementById('swipe-hint');
+    const padded    = document.getElementById('padded-content');
+
+    dateSub.style.display = w >= 640 ? 'block' : 'none';
+    ctaLabel.textContent  = w >= 480 ? 'Book Appointment' : 'Book';
+    if (swipeHint) swipeHint.style.display = w >= 768 ? 'none' : 'block';
+    padded.style.padding = w >= 768 ? '0 24px 24px' : '0 16px 16px';
+
+    // Vitals: 3-col on md+
+    if (vitalsGrid) vitalsGrid.style.gridTemplateColumns = w >= 640 ? 'repeat(3,1fr)' : 'repeat(2,1fr)';
+
+    // Row 2: vitals + right panel side by side on lg+
+    if (row2) row2.style.gridTemplateColumns = w >= 1024 ? '1.2fr 1fr' : '1fr';
+
+    // Row 3: 2 cols on md+
+    if (row3) row3.style.gridTemplateColumns = w >= 768 ? '1fr 1fr' : '1fr';
+
+    // Row 4: 3-col lg | 2-col md | 1-col sm
+    if (row4) {
+      if (w >= 1024)     row4.style.gridTemplateColumns = '1fr 1fr 1fr';
+      else if (w >= 640) row4.style.gridTemplateColumns = '1fr 1fr';
+      else               row4.style.gridTemplateColumns = '1fr';
+    }
+  }
+
+  applyLayout();
+  window.addEventListener('resize', applyLayout);
+</script>
+</body>
+</html>
