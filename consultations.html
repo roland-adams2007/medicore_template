@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Consultations</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink:        #0D1117;
+      --paper:      #F7F4EF;
+      --sage:       #4A7C59;
+      --sage-light: #6BA37A;
+      --sage-dark:  #2F5C3A;
+      --sage-pale:  #E8F2EB;
+      --blush:      #E8927C;
+      --blush-pale: #FAF0ED;
+      --gold:       #C9A84C;
+      --gold-pale:  #FBF6E9;
+      --slate:      #8A9BB0;
+      --slate-pale: #EEF2F7;
+      --border:     rgba(13,17,23,0.09);
+      --sidebar-w:  260px;
+    }
+    html, body { height:100%; font-family:'DM Sans',sans-serif; background:var(--paper); color:var(--ink); overflow:hidden; }
+    #app { display:flex; height:100vh; overflow:hidden; }
+
+    /* ══ SIDEBAR ══ */
+    #sidebar {
+      width:var(--sidebar-w); background:var(--ink);
+      display:flex; flex-direction:column; flex-shrink:0;
+      height:100vh; overflow-y:auto;
+      transition:transform 0.28s cubic-bezier(0.4,0,0.2,1); z-index:50;
+    }
+    @media (max-width:1023px) {
+      #sidebar { position:fixed; top:0; left:0; transform:translateX(-100%); }
+      #sidebar.open { transform:translateX(0); box-shadow:4px 0 32px rgba(0,0,0,0.3); }
+    }
+    #overlay { display:none; position:fixed; inset:0; background:rgba(13,17,23,0.45); backdrop-filter:blur(2px); z-index:40; }
+    #overlay.show { display:block; }
+    .nav-item {
+      display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px;
+      color:#8A9BB0; text-decoration:none; font-size:14px;
+      transition:background 0.15s,color 0.15s; border-left:3px solid transparent;
+    }
+    .nav-item:hover { background:rgba(74,124,89,0.15); color:#fff; }
+    .nav-item.active { background:rgba(74,124,89,0.22); color:#fff; border-left-color:var(--sage); }
+
+    /* ══ MAIN ══ */
+    #main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ══ TOPBAR ══ */
+    #topbar {
+      background:rgba(247,244,239,0.95); backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+      padding:0 20px; height:60px; display:flex; align-items:center; gap:12px;
+      flex-shrink:0;
+    }
+    #ham-btn { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid var(--border); border-radius:9px; cursor:pointer; flex-shrink:0; }
+    @media (min-width:1024px) { #ham-btn { display:none; } }
+    .top-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--ink); }
+    .top-live { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--sage); }
+    .live-dot { width:8px; height:8px; background:var(--sage); border-radius:50%; animation:pdot 2s infinite; }
+    @keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
+
+    /* ══ BODY — 3 COLUMN ══ */
+    #body { flex:1; display:flex; overflow:hidden; }
+
+    /* ══ QUEUE PANEL ══ */
+    #queue-panel {
+      width:280px; flex-shrink:0; display:flex; flex-direction:column;
+      background:#fff; border-right:1px solid var(--border); overflow:hidden;
+    }
+    .queue-header { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .queue-header h3 { font-family:'DM Serif Display',serif; font-size:16px; color:var(--ink); }
+    .queue-count { font-size:11px; font-weight:700; background:var(--sage-pale); color:var(--sage-dark); padding:3px 9px; border-radius:100px; }
+
+    .queue-tabs { display:flex; padding:8px; gap:4px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .qtab { flex:1; padding:6px 4px; text-align:center; font-size:11px; font-weight:600; border:none; background:none; border-radius:7px; cursor:pointer; color:var(--slate); font-family:'DM Sans',sans-serif; transition:all 0.15s; }
+    .qtab.active { background:var(--sage-pale); color:var(--sage-dark); }
+
+    #queue-list { flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:4px; }
+    .q-item {
+      display:flex; align-items:center; gap:10px; padding:10px 12px;
+      border:1.5px solid var(--border); border-radius:12px; cursor:pointer;
+      transition:all 0.15s; background:#fff; position:relative;
+    }
+    .q-item:hover { border-color:var(--sage); background:var(--sage-pale); }
+    .q-item.active-consult { border-color:var(--sage); background:var(--sage-pale); }
+    .q-item.active-consult::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--sage); border-radius:12px 0 0 12px; }
+    .q-num { width:24px; height:24px; border-radius:50%; background:var(--slate-pale); font-size:11px; font-weight:700; color:var(--slate); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .q-item.active-consult .q-num { background:var(--sage); color:#fff; }
+    .q-av { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; flex-shrink:0; }
+    .q-info { flex:1; min-width:0; }
+    .q-name { font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .q-meta { font-size:11px; color:var(--slate); margin-top:1px; }
+    .q-wait { font-size:10px; font-weight:700; color:var(--gold); }
+
+    /* ══ CONSULTATION WORKSPACE ══ */
+    #workspace {
+      flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;
+      background:var(--paper);
+    }
+
+    /* Empty state */
+    #empty-state {
+      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:16px; color:var(--slate); padding:40px;
+    }
+    .empty-icon { width:72px; height:72px; border-radius:20px; background:#fff; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; }
+    #empty-state h3 { font-family:'DM Serif Display',serif; font-size:22px; color:var(--ink); }
+    #empty-state p  { font-size:14px; text-align:center; max-width:300px; line-height:1.65; }
+
+    /* Patient banner */
+    #patient-banner {
+      padding:14px 20px; background:#fff; border-bottom:1px solid var(--border);
+      display:none; flex-shrink:0;
+    }
+    .banner-inner { display:flex; align-items:center; gap:14px; }
+    .banner-av { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; flex-shrink:0; }
+    .banner-name { font-family:'DM Serif Display',serif; font-size:18px; color:var(--ink); }
+    .banner-meta { font-size:12px; color:var(--slate); margin-top:3px; display:flex; flex-wrap:wrap; gap:8px; }
+    .banner-chip { display:flex; align-items:center; gap:4px; font-size:11px; background:var(--paper); border:1px solid var(--border); border-radius:6px; padding:2px 8px; }
+    .banner-chip.alert { background:var(--blush-pale); border-color:rgba(232,146,124,0.3); color:#c05c3c; }
+    .banner-chip.warn  { background:var(--gold-pale);  border-color:rgba(201,168,76,0.3);  color:#8b6a1a; }
+    .banner-actions { margin-left:auto; display:flex; gap:8px; flex-shrink:0; }
+    .btn-end { display:flex; align-items:center; gap:6px; padding:8px 16px; background:var(--blush-pale); color:#c05c3c; font-size:13px; font-weight:600; border:1px solid rgba(232,146,124,0.3); border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.15s; }
+    .btn-end:hover { background:var(--blush); color:#fff; border-color:var(--blush); }
+    .btn-complete { display:flex; align-items:center; gap:6px; padding:8px 16px; background:var(--sage); color:#fff; font-size:13px; font-weight:600; border:none; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.15s; }
+    .btn-complete:hover { background:var(--sage-dark); box-shadow:0 4px 14px rgba(47,92,58,0.3); }
+
+    /* Vitals quick row */
+    #vitals-bar {
+      display:none; padding:10px 20px; background:#fff; border-bottom:1px solid var(--border);
+      gap:8px; flex-wrap:wrap; flex-shrink:0;
+    }
+    .vital-pill {
+      display:flex; align-items:center; gap:6px; padding:7px 12px;
+      background:var(--paper); border:1px solid var(--border); border-radius:10px; cursor:pointer;
+      transition:border-color 0.15s;
+    }
+    .vital-pill:hover { border-color:var(--sage); }
+    .vital-pill.alert { background:var(--blush-pale); border-color:rgba(232,146,124,0.3); }
+    .vp-label { font-size:10px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:0.05em; }
+    .vp-val   { font-size:14px; font-weight:700; color:var(--ink); }
+    .vital-pill.alert .vp-val { color:#c05c3c; }
+    .vp-icon  { color:var(--slate); }
+    .vital-pill.alert .vp-icon { color:var(--blush); }
+
+    /* Consultation notes workspace */
+    #notes-workspace {
+      flex:1; overflow-y:auto; padding:20px; display:none;
+    }
+
+    /* SOAP sections */
+    .soap-section { background:#fff; border-radius:14px; border:1px solid var(--border); margin-bottom:14px; overflow:hidden; }
+    .soap-header {
+      display:flex; align-items:center; gap:10px; padding:12px 16px;
+      border-bottom:1px solid var(--border); cursor:pointer; user-select:none;
+      transition:background 0.12s;
+    }
+    .soap-header:hover { background:var(--paper); }
+    .soap-tag { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0; }
+    .soap-title { font-size:14px; font-weight:700; color:var(--ink); flex:1; }
+    .soap-subtitle { font-size:11px; color:var(--slate); }
+    .soap-collapse-btn { color:var(--slate); transition:transform 0.2s; }
+    .soap-body { padding:14px 16px; }
+    .soap-collapsed .soap-body { display:none; }
+    .soap-collapsed .soap-collapse-btn { transform:rotate(-90deg); }
+
+    .soap-field { margin-bottom:12px; }
+    .soap-field:last-child { margin-bottom:0; }
+    .soap-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--slate); margin-bottom:6px; }
+    .soap-textarea {
+      width:100%; min-height:80px; padding:10px 12px;
+      font-size:13px; font-family:'DM Sans',sans-serif; line-height:1.6;
+      background:var(--paper); border:1.5px solid var(--border); border-radius:9px;
+      outline:none; color:var(--ink); resize:vertical;
+      transition:border-color 0.15s,box-shadow 0.15s;
+    }
+    .soap-textarea:focus { border-color:var(--sage); box-shadow:0 0 0 3px rgba(74,124,89,0.1); background:#fff; }
+    .soap-textarea::placeholder { color:#B8C0CC; }
+    .soap-input {
+      width:100%; padding:9px 12px;
+      font-size:13px; font-family:'DM Sans',sans-serif;
+      background:var(--paper); border:1.5px solid var(--border); border-radius:9px;
+      outline:none; color:var(--ink);
+      transition:border-color 0.15s,box-shadow 0.15s; -webkit-appearance:none;
+    }
+    .soap-input:focus { border-color:var(--sage); box-shadow:0 0 0 3px rgba(74,124,89,0.1); background:#fff; }
+    .soap-input::placeholder { color:#B8C0CC; }
+    .soap-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width:700px) { .soap-row { grid-template-columns:1fr; } }
+
+    /* Vitals input row */
+    .vitals-input-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    @media (max-width:700px) { .vitals-input-grid { grid-template-columns:1fr 1fr; } }
+
+    /* ══ PRESCRIPTION BUILDER ══ */
+    #rx-panel {
+      width:300px; flex-shrink:0; display:flex; flex-direction:column;
+      background:#fff; border-left:1px solid var(--border); overflow:hidden;
+    }
+    .rx-header { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .rx-header h3 { font-family:'DM Serif Display',serif; font-size:16px; color:var(--ink); }
+    .rx-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .rx-tab { flex:1; padding:10px 6px; text-align:center; font-size:12px; font-weight:600; border:none; background:none; cursor:pointer; color:var(--slate); font-family:'DM Sans',sans-serif; border-bottom:2px solid transparent; transition:all 0.15s; }
+    .rx-tab.active { color:var(--sage); border-bottom-color:var(--sage); }
+    .rx-tab-content { display:none; }
+    .rx-tab-content.active { display:flex; flex-direction:column; }
+
+    #rx-panel-scroll { flex:1; overflow-y:auto; }
+
+    /* Drug list */
+    .drug-item { display:flex; align-items:flex-start; gap:10px; padding:10px 16px; border-bottom:1px solid rgba(13,17,23,0.05); }
+    .drug-item:last-child { border-bottom:none; }
+    .drug-icon { width:34px; height:34px; border-radius:8px; background:var(--sage-pale); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .drug-name { font-size:13px; font-weight:600; color:var(--ink); }
+    .drug-dose { font-size:11px; color:var(--slate); margin-top:1px; }
+    .drug-remove { margin-left:auto; width:26px; height:26px; border-radius:6px; background:none; border:none; cursor:pointer; color:var(--slate); display:flex; align-items:center; justify-content:center; transition:all 0.15s; flex-shrink:0; }
+    .drug-remove:hover { background:var(--blush-pale); color:var(--blush); }
+
+    .rx-add-form { padding:12px 14px; border-top:1px solid var(--border); flex-shrink:0; }
+    .rx-input { width:100%; padding:8px 10px; font-size:12px; font-family:'DM Sans',sans-serif; background:var(--paper); border:1px solid var(--border); border-radius:8px; outline:none; color:var(--ink); margin-bottom:6px; -webkit-appearance:none; }
+    .rx-input:focus { border-color:var(--sage); background:#fff; }
+    .rx-input::placeholder { color:#B8C0CC; }
+    .rx-input-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
+    .btn-rx-add { width:100%; padding:9px; background:var(--sage); color:#fff; font-size:12px; font-weight:600; border:none; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.15s; display:flex; align-items:center; justify-content:center; gap:5px; }
+    .btn-rx-add:hover { background:var(--sage-dark); }
+
+    /* History tab in rx panel */
+    .hist-item { padding:10px 16px; border-bottom:1px solid rgba(13,17,23,0.05); cursor:pointer; }
+    .hist-item:hover { background:var(--paper); }
+    .hist-item:last-child { border-bottom:none; }
+    .hist-date { font-size:10px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+    .hist-type { font-size:13px; font-weight:600; color:var(--ink); }
+    .hist-doctor { font-size:11px; color:var(--slate); }
+    .hist-note-preview { font-size:11px; color:var(--slate); margin-top:4px; font-style:italic; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+
+    /* Lab request tab */
+    .lab-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid rgba(13,17,23,0.05); }
+    .lab-item:last-child { border-bottom:none; }
+    .lab-item-name { font-size:13px; font-weight:500; color:var(--ink); flex:1; }
+    .lab-remove { width:26px; height:26px; border-radius:6px; background:none; border:none; cursor:pointer; color:var(--slate); display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+    .lab-remove:hover { background:var(--blush-pale); color:var(--blush); }
+
+    /* ══ TIMER ══ */
+    #consult-timer { font-family:'DM Serif Display',serif; font-size:16px; color:var(--sage); font-variant-numeric:tabular-nums; margin-left:auto; }
+
+    /* ══ SAVE BAR ══ */
+    #save-bar { display:none; padding:10px 16px; background:var(--sage-pale); border-top:1px solid rgba(74,124,89,0.2); flex-shrink:0; align-items:center; gap:10px; }
+    #save-bar p { font-size:13px; color:var(--sage-dark); flex:1; }
+    .btn-save-notes { padding:8px 18px; background:var(--sage); color:#fff; font-size:13px; font-weight:600; border:none; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.15s; }
+    .btn-save-notes:hover { background:var(--sage-dark); }
+
+    /* ══ MODAL ══ */
+    #modal-overlay { display:none; position:fixed; inset:0; background:rgba(13,17,23,0.5); backdrop-filter:blur(4px); z-index:200; align-items:center; justify-content:center; padding:20px; }
+    #modal-overlay.open { display:flex; }
+    #modal { background:#fff; border-radius:18px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(13,17,23,0.25); animation:mIn 0.22s ease; }
+    @keyframes mIn { from{opacity:0;transform:scale(0.95) translateY(8px)}to{opacity:1;transform:none} }
+    .mh { padding:20px 20px 0; display:flex; align-items:center; justify-content:space-between; }
+    .mh h2 { font-family:'DM Serif Display',serif; font-size:20px; }
+    .mc { width:30px; height:30px; background:var(--paper); border:none; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--slate); }
+    .mc:hover { background:var(--blush-pale); color:var(--blush); }
+    .mb { padding:16px 20px 20px; }
+    .mf { margin-bottom:12px; }
+    .mf label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink); margin-bottom:5px; }
+    .mf input,.mf select,.mf textarea { width:100%; padding:9px 11px; font-size:13px; font-family:'DM Sans',sans-serif; background:var(--paper); border:1.5px solid var(--border); border-radius:9px; outline:none; color:var(--ink); transition:border-color 0.15s; -webkit-appearance:none; }
+    .mf input:focus,.mf select:focus,.mf textarea:focus { border-color:var(--sage); background:#fff; }
+    .mf input::placeholder,.mf textarea::placeholder { color:#B8C0CC; }
+    .mrow { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .macts { display:flex; gap:8px; margin-top:16px; }
+    .mbtn-c { flex:1; padding:10px; background:var(--paper); border:1.5px solid var(--border); border-radius:9px; font-size:13px; font-weight:600; color:var(--slate); cursor:pointer; font-family:'DM Sans',sans-serif; }
+    .mbtn-s { flex:2; padding:10px; background:var(--sage); border:none; border-radius:9px; font-size:13px; font-weight:600; color:#fff; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.15s; }
+    .mbtn-s:hover { background:var(--sage-dark); }
+
+    /* ══ SCROLLBARS ══ */
+    ::-webkit-scrollbar { width:4px; height:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#C8C4BC; border-radius:100px; }
+
+    /* ══ BOTTOM NAV ══ */
+    #bottom-nav { position:fixed; bottom:0; left:0; right:0; background:var(--ink); border-top:1px solid rgba(255,255,255,0.08); display:flex; z-index:45; padding-bottom:env(safe-area-inset-bottom,0); }
+    @media (min-width:1024px) { #bottom-nav { display:none; } }
+    #bottom-nav a { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 8px; color:#8A9BB0; font-size:10px; text-decoration:none; transition:color 0.15s; }
+    #bottom-nav a.active, #bottom-nav a:hover { color:var(--sage); }
+
+    /* responsive panels */
+    @media (max-width:1100px) { #rx-panel { display:none; } }
+    @media (max-width:780px)  { #queue-panel { width:240px; } }
+    @media (max-width:640px)  {
+      #queue-panel { position:fixed; left:0; top:0; bottom:0; z-index:55; transform:translateX(-100%); transition:transform 0.28s cubic-bezier(0.4,0,0.2,1); box-shadow:4px 0 24px rgba(0,0,0,0.2); }
+      #queue-panel.open { transform:translateX(0); }
+      #queue-toggle-btn { display:flex !important; }
+    }
+    #queue-toggle-btn { display:none; align-items:center; gap:6px; padding:7px 12px; background:#fff; border:1px solid var(--border); border-radius:9px; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer; font-family:'DM Sans',sans-serif; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside id="sidebar">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#4A7C59,#2F5C3A);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="activity" style="width:18px;height:18px;color:#fff;"></i>
+        </div>
+        <div>
+          <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1;">MediCore</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:2px;">Clinic Admin</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#8A9BB0;background:rgba(255,255,255,0.06);border:none;border-radius:8px;cursor:pointer;"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+    </div>
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:12px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;">GH</div>
+        <div style="flex:1;min-width:0;"><p style="color:#fff;font-size:13px;font-weight:600;">Grace Health Clinic</p><p style="color:#8A9BB0;font-size:11px;margin-top:1px;">Dr. Adaeze Obi · Admin</p></div>
+      </div>
+    </div>
+    <nav style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:2px;">
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:6px 12px;">Main</p>
+      <a href="#" class="nav-item"><i data-lucide="layout-dashboard" style="width:16px;height:16px;flex-shrink:0;"></i>Dashboard</a>
+      <a href="#" class="nav-item"><i data-lucide="calendar-days" style="width:16px;height:16px;flex-shrink:0;"></i>Appointments</a>
+      <a href="#" class="nav-item"><i data-lucide="users" style="width:16px;height:16px;flex-shrink:0;"></i>Patients</a>
+      <a href="#" class="nav-item"><i data-lucide="stethoscope" style="width:16px;height:16px;flex-shrink:0;"></i>Doctors</a>
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:14px 12px 6px;">Clinical</p>
+      <a href="#" class="nav-item active"><i data-lucide="clipboard-list" style="width:16px;height:16px;flex-shrink:0;"></i>Consultations</a>
+      <a href="#" class="nav-item"><i data-lucide="file-heart" style="width:16px;height:16px;flex-shrink:0;"></i>Medical Records</a>
+      <a href="#" class="nav-item"><i data-lucide="pill" style="width:16px;height:16px;flex-shrink:0;"></i>Prescriptions</a>
+      <a href="#" class="nav-item"><i data-lucide="flask-conical" style="width:16px;height:16px;flex-shrink:0;"></i>Lab Results</a>
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:14px 12px 6px;">Admin</p>
+      <a href="#" class="nav-item"><i data-lucide="receipt" style="width:16px;height:16px;flex-shrink:0;"></i>Billing</a>
+      <a href="#" class="nav-item"><i data-lucide="bar-chart-2" style="width:16px;height:16px;flex-shrink:0;"></i>Reports</a>
+      <a href="#" class="nav-item"><i data-lucide="settings" style="width:16px;height:16px;flex-shrink:0;"></i>Settings</a>
+    </nav>
+    <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">AO</div>
+      <div style="flex:1;min-width:0;"><p style="color:#fff;font-size:13px;font-weight:500;">Dr. Adaeze Obi</p><p style="color:#8A9BB0;font-size:11px;">Clinic Admin</p></div>
+      <button style="background:none;border:none;color:#8A9BB0;cursor:pointer;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#8A9BB0'"><i data-lucide="log-out" style="width:15px;height:15px;"></i></button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <button id="ham-btn" onclick="openSidebar()" style="background:#fff;border:1px solid var(--border);border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+        <i data-lucide="menu" style="width:17px;height:17px;color:var(--ink);"></i>
+      </button>
+      <button id="queue-toggle-btn" onclick="toggleQueue()">
+        <i data-lucide="list" style="width:15px;height:15px;"></i>
+        Queue
+      </button>
+      <span class="top-title">Consultations</span>
+      <div class="top-live" id="live-badge" style="display:none;">
+        <div class="live-dot"></div>
+        In Session
+      </div>
+      <div id="consult-timer" style="display:none;">00:00</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+        <select id="doctor-select" onchange="filterQueue()" style="padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--ink);outline:none;cursor:pointer;">
+          <option value="all">All Doctors</option>
+          <option value="Dr. Bello">Dr. Bello</option>
+          <option value="Dr. Okafor">Dr. Okafor</option>
+          <option value="Dr. Adaeze" selected>Dr. Adaeze</option>
+          <option value="Dr. Yusuf">Dr. Yusuf</option>
+        </select>
+        <button onclick="openWalkinModal()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--sage);color:#fff;font-size:13px;font-weight:600;border:none;border-radius:9px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
+          <i data-lucide="user-plus" style="width:14px;height:14px;"></i>
+          <span id="add-lbl">Add Walk-in</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div id="body">
+
+      <!-- QUEUE PANEL -->
+      <div id="queue-panel">
+        <div class="queue-header">
+          <h3>Today's Queue</h3>
+          <span class="queue-count" id="queue-count-badge">0 waiting</span>
+        </div>
+        <div class="queue-tabs">
+          <button class="qtab active" onclick="setQTab(this,'waiting')" data-qt="waiting">Waiting</button>
+          <button class="qtab"        onclick="setQTab(this,'active')"  data-qt="active">Active</button>
+          <button class="qtab"        onclick="setQTab(this,'done')"    data-qt="done">Done</button>
+        </div>
+        <div id="queue-list"></div>
+      </div>
+
+      <!-- WORKSPACE -->
+      <div id="workspace">
+
+        <!-- Empty -->
+        <div id="empty-state">
+          <div class="empty-icon">
+            <i data-lucide="clipboard-list" style="width:32px;height:32px;color:var(--slate);"></i>
+          </div>
+          <h3>No active consultation</h3>
+          <p>Select a patient from the queue to begin a consultation, or add a walk-in patient.</p>
+          <button onclick="openWalkinModal()" style="display:flex;align-items:center;gap:7px;padding:10px 20px;background:var(--sage);color:#fff;font-size:14px;font-weight:600;border:none;border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;">
+            <i data-lucide="user-plus" style="width:16px;height:16px;"></i>
+            Add Walk-in Patient
+          </button>
+        </div>
+
+        <!-- Patient banner (shown when consulting) -->
+        <div id="patient-banner">
+          <div class="banner-inner">
+            <div class="banner-av" id="banner-av"></div>
+            <div>
+              <div class="banner-name" id="banner-name">—</div>
+              <div class="banner-meta" id="banner-meta"></div>
+            </div>
+            <div class="banner-actions">
+              <button class="btn-end" onclick="endConsultation()">
+                <i data-lucide="x" style="width:14px;height:14px;"></i> End
+              </button>
+              <button class="btn-complete" onclick="completeConsultation()">
+                <i data-lucide="check" style="width:14px;height:14px;"></i> Complete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vitals bar -->
+        <div id="vitals-bar" id="vitals-bar">
+          <div class="vital-pill" id="vp-bp">
+            <i data-lucide="heart-pulse" style="width:15px;height:15px;" class="vp-icon"></i>
+            <div><div class="vp-label">BP</div><div class="vp-val" id="vp-bp-val">—</div></div>
+          </div>
+          <div class="vital-pill">
+            <i data-lucide="activity" style="width:15px;height:15px;color:var(--slate);"></i>
+            <div><div class="vp-label">HR</div><div class="vp-val" id="vp-hr-val">—</div></div>
+          </div>
+          <div class="vital-pill">
+            <i data-lucide="thermometer" style="width:15px;height:15px;color:var(--slate);"></i>
+            <div><div class="vp-label">Temp</div><div class="vp-val" id="vp-temp-val">—</div></div>
+          </div>
+          <div class="vital-pill">
+            <i data-lucide="weight" style="width:15px;height:15px;color:var(--slate);"></i>
+            <div><div class="vp-label">Weight</div><div class="vp-val" id="vp-weight-val">—</div></div>
+          </div>
+          <div class="vital-pill">
+            <i data-lucide="wind" style="width:15px;height:15px;color:var(--slate);"></i>
+            <div><div class="vp-label">SpO₂</div><div class="vp-val" id="vp-spo2-val">—</div></div>
+          </div>
+        </div>
+
+        <!-- Notes workspace -->
+        <div id="notes-workspace">
+
+          <!-- S — Subjective -->
+          <div class="soap-section" id="sec-S">
+            <div class="soap-header" onclick="toggleSoap('S')">
+              <div class="soap-tag" style="background:#E8F2EB;color:#2F5C3A;">S</div>
+              <div>
+                <div class="soap-title">Subjective</div>
+                <div class="soap-subtitle">Chief complaint & patient history</div>
+              </div>
+              <i data-lucide="chevron-down" style="width:16px;height:16px;" class="soap-collapse-btn"></i>
+            </div>
+            <div class="soap-body">
+              <div class="soap-field">
+                <div class="soap-label">Chief Complaint</div>
+                <textarea class="soap-textarea" id="s-complaint" placeholder="e.g. Patient presents with persistent headache and dizziness for 3 days…" oninput="markUnsaved()"></textarea>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">History of Present Illness</div>
+                <textarea class="soap-textarea" id="s-hpi" placeholder="Onset, duration, character, associated symptoms…" oninput="markUnsaved()"></textarea>
+              </div>
+              <div class="soap-row">
+                <div class="soap-field">
+                  <div class="soap-label">Past Medical History</div>
+                  <textarea class="soap-textarea" style="min-height:60px;" id="s-pmh" placeholder="Known conditions, surgeries…" oninput="markUnsaved()"></textarea>
+                </div>
+                <div class="soap-field">
+                  <div class="soap-label">Current Medications</div>
+                  <textarea class="soap-textarea" style="min-height:60px;" id="s-meds" placeholder="List current medications…" oninput="markUnsaved()"></textarea>
+                </div>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">Allergies</div>
+                <input class="soap-input" id="s-allergy" type="text" placeholder="e.g. Penicillin, Aspirin, NKDA" oninput="markUnsaved()"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- O — Objective -->
+          <div class="soap-section" id="sec-O">
+            <div class="soap-header" onclick="toggleSoap('O')">
+              <div class="soap-tag" style="background:#FBF6E9;color:#8b6a1a;">O</div>
+              <div>
+                <div class="soap-title">Objective</div>
+                <div class="soap-subtitle">Vitals & physical examination</div>
+              </div>
+              <i data-lucide="chevron-down" style="width:16px;height:16px;" class="soap-collapse-btn"></i>
+            </div>
+            <div class="soap-body">
+              <div class="soap-label" style="margin-bottom:8px;">Vitals</div>
+              <div class="vitals-input-grid" style="margin-bottom:12px;">
+                <div class="soap-field" style="margin-bottom:0;">
+                  <div class="soap-label">Blood Pressure</div>
+                  <input class="soap-input" id="o-bp" placeholder="e.g. 130/85" oninput="markUnsaved();updateVitalPill('bp',this.value)"/>
+                </div>
+                <div class="soap-field" style="margin-bottom:0;">
+                  <div class="soap-label">Heart Rate (bpm)</div>
+                  <input class="soap-input" id="o-hr" placeholder="e.g. 76" oninput="markUnsaved();updateVitalPill('hr',this.value)"/>
+                </div>
+                <div class="soap-field" style="margin-bottom:0;">
+                  <div class="soap-label">Temperature (°C)</div>
+                  <input class="soap-input" id="o-temp" placeholder="e.g. 37.2" oninput="markUnsaved();updateVitalPill('temp',this.value)"/>
+                </div>
+                <div class="soap-field" style="margin-bottom:0;">
+                  <div class="soap-label">Weight (kg)</div>
+                  <input class="soap-input" id="o-weight" placeholder="e.g. 72" oninput="markUnsaved();updateVitalPill('weight',this.value)"/>
+                </div>
+                <div class="soap-field" style="margin-bottom:0;">
+                  <div class="soap-label">SpO₂ (%)</div>
+                  <input class="soap-input" id="o-spo2" placeholder="e.g. 98" oninput="markUnsaved();updateVitalPill('spo2',this.value)"/>
+                </div>
+                <div class="soap-field" style="margin-bottom:0;">
+                  <div class="soap-label">Resp. Rate</div>
+                  <input class="soap-input" id="o-rr" placeholder="e.g. 18" oninput="markUnsaved()"/>
+                </div>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">Physical Examination Findings</div>
+                <textarea class="soap-textarea" id="o-exam" placeholder="General appearance, cardiovascular, respiratory, abdomen findings…" oninput="markUnsaved()"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- A — Assessment -->
+          <div class="soap-section" id="sec-A">
+            <div class="soap-header" onclick="toggleSoap('A')">
+              <div class="soap-tag" style="background:#FAF0ED;color:#c05c3c;">A</div>
+              <div>
+                <div class="soap-title">Assessment</div>
+                <div class="soap-subtitle">Diagnosis & clinical impression</div>
+              </div>
+              <i data-lucide="chevron-down" style="width:16px;height:16px;" class="soap-collapse-btn"></i>
+            </div>
+            <div class="soap-body">
+              <div class="soap-field">
+                <div class="soap-label">Primary Diagnosis</div>
+                <input class="soap-input" id="a-dx" placeholder="e.g. Essential hypertension — ICD J10.0" oninput="markUnsaved()"/>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">Secondary Diagnoses</div>
+                <input class="soap-input" id="a-dx2" placeholder="e.g. Type 2 Diabetes Mellitus" oninput="markUnsaved()"/>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">Clinical Notes</div>
+                <textarea class="soap-textarea" id="a-notes" placeholder="Clinical reasoning, differential diagnoses considered…" oninput="markUnsaved()"></textarea>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">Severity</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button class="soap-sev-btn" onclick="setSeverity(this,'mild')"     style="padding:6px 14px;font-size:12px;font-weight:600;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;">Mild</button>
+                  <button class="soap-sev-btn" onclick="setSeverity(this,'moderate')" style="padding:6px 14px;font-size:12px;font-weight:600;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;">Moderate</button>
+                  <button class="soap-sev-btn" onclick="setSeverity(this,'severe')"   style="padding:6px 14px;font-size:12px;font-weight:600;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;">Severe</button>
+                  <button class="soap-sev-btn" onclick="setSeverity(this,'critical')" style="padding:6px 14px;font-size:12px;font-weight:600;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;">Critical</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- P — Plan -->
+          <div class="soap-section" id="sec-P">
+            <div class="soap-header" onclick="toggleSoap('P')">
+              <div class="soap-tag" style="background:var(--slate-pale);color:#4A6580;">P</div>
+              <div>
+                <div class="soap-title">Plan</div>
+                <div class="soap-subtitle">Treatment, follow-up & instructions</div>
+              </div>
+              <i data-lucide="chevron-down" style="width:16px;height:16px;" class="soap-collapse-btn"></i>
+            </div>
+            <div class="soap-body">
+              <div class="soap-field">
+                <div class="soap-label">Treatment Plan</div>
+                <textarea class="soap-textarea" id="p-plan" placeholder="Medications, procedures, referrals…" oninput="markUnsaved()"></textarea>
+              </div>
+              <div class="soap-row">
+                <div class="soap-field">
+                  <div class="soap-label">Follow-up</div>
+                  <input class="soap-input" id="p-followup" type="text" placeholder="e.g. 2 weeks, after labs" oninput="markUnsaved()"/>
+                </div>
+                <div class="soap-field">
+                  <div class="soap-label">Refer to</div>
+                  <input class="soap-input" id="p-refer" type="text" placeholder="e.g. Cardiology" oninput="markUnsaved()"/>
+                </div>
+              </div>
+              <div class="soap-field">
+                <div class="soap-label">Patient Instructions</div>
+                <textarea class="soap-textarea" style="min-height:60px;" id="p-instructions" placeholder="Lifestyle advice, diet, exercise, rest…" oninput="markUnsaved()"></textarea>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /notes-workspace -->
+
+        <!-- Save bar -->
+        <div id="save-bar">
+          <i data-lucide="save" style="width:15px;height:15px;color:var(--sage);"></i>
+          <p>Unsaved changes</p>
+          <button class="btn-save-notes" onclick="saveNotes()">Save Notes</button>
+        </div>
+
+      </div><!-- /workspace -->
+
+      <!-- RX PANEL -->
+      <div id="rx-panel">
+        <div class="rx-header">
+          <h3>Prescriptions</h3>
+          <button onclick="openLabModal()" style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:11px;font-weight:600;background:var(--gold-pale);color:#8b6a1a;border:1px solid rgba(201,168,76,0.3);border-radius:7px;cursor:pointer;font-family:'DM Sans',sans-serif;">
+            <i data-lucide="flask-conical" style="width:13px;height:13px;"></i>Request Lab
+          </button>
+        </div>
+        <div class="rx-tabs">
+          <button class="rx-tab active" onclick="switchRxTab(this,'tab-rx')">Prescriptions</button>
+          <button class="rx-tab"        onclick="switchRxTab(this,'tab-labs')">Lab Requests</button>
+          <button class="rx-tab"        onclick="switchRxTab(this,'tab-history')">History</button>
+        </div>
+
+        <div id="rx-panel-scroll" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+
+          <!-- Prescriptions tab -->
+          <div id="tab-rx" class="rx-tab-content active" style="flex:1;flex-direction:column;">
+            <div id="drug-list" style="flex:1;"></div>
+            <div class="rx-add-form">
+              <p style="font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Add Medication</p>
+              <input class="rx-input" id="rx-drug" placeholder="Drug name e.g. Amlodipine 5mg" list="drug-suggestions"/>
+              <datalist id="drug-suggestions">
+                <option>Amlodipine 5mg</option><option>Metformin 500mg</option><option>Lisinopril 10mg</option>
+                <option>Atorvastatin 20mg</option><option>Amoxicillin 500mg</option><option>Paracetamol 500mg</option>
+                <option>Ibuprofen 400mg</option><option>Omeprazole 20mg</option><option>Hydrochlorothiazide 25mg</option>
+                <option>Metronidazole 400mg</option><option>Diclofenac 50mg</option><option>Chloroquine 250mg</option>
+                <option>Artemether/Lumefantrine</option><option>Co-trimoxazole 480mg</option><option>Doxycycline 100mg</option>
+              </datalist>
+              <div class="rx-input-row">
+                <select class="rx-input" id="rx-freq">
+                  <option value="" disabled selected>Frequency</option>
+                  <option>Once daily</option><option>Twice daily</option><option>Three times daily</option>
+                  <option>Four times daily</option><option>As needed</option><option>At bedtime</option>
+                </select>
+                <input class="rx-input" id="rx-dur" placeholder="Duration e.g. 7 days"/>
+              </div>
+              <input class="rx-input" id="rx-note" placeholder="Instructions e.g. after food" style="margin-bottom:8px;"/>
+              <button class="btn-rx-add" onclick="addDrug()">
+                <i data-lucide="plus" style="width:13px;height:13px;"></i>Add to Prescription
+              </button>
+            </div>
+          </div>
+
+          <!-- Lab requests tab -->
+          <div id="tab-labs" class="rx-tab-content" style="flex:1;flex-direction:column;">
+            <div id="lab-list" style="flex:1;"></div>
+            <div class="rx-add-form">
+              <p style="font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Request Test</p>
+              <input class="rx-input" id="lab-input" placeholder="e.g. Full Blood Count" list="lab-suggestions" style="margin-bottom:8px;"/>
+              <datalist id="lab-suggestions">
+                <option>Full Blood Count (FBC)</option><option>Urinalysis</option><option>Lipid Panel</option>
+                <option>Blood Glucose (Fasting)</option><option>HbA1c</option><option>Malaria RDT</option>
+                <option>Liver Function Test (LFT)</option><option>Urea/Creatinine</option><option>Chest X-Ray</option>
+                <option>ECG</option><option>Thyroid Function Test</option><option>HIV Screening</option><option>Widal Test</option>
+              </datalist>
+              <button class="btn-rx-add" onclick="addLab()" style="background:var(--gold);">
+                <i data-lucide="plus" style="width:13px;height:13px;"></i>Add Lab Request
+              </button>
+            </div>
+          </div>
+
+          <!-- History tab -->
+          <div id="tab-history" class="rx-tab-content" style="flex:1;" id="hist-list">
+            <div id="hist-content"></div>
+          </div>
+
+        </div>
+      </div><!-- /rx-panel -->
+
+    </div><!-- /body -->
+  </div><!-- /main -->
+</div>
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav">
+  <a href="#"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i><span>Home</span></a>
+  <a href="#"><i data-lucide="calendar-days" style="width:20px;height:20px;"></i><span>Appts</span></a>
+  <a href="#" class="active"><i data-lucide="clipboard-list" style="width:20px;height:20px;"></i><span>Consults</span></a>
+  <a href="#"><i data-lucide="receipt" style="width:20px;height:20px;"></i><span>Billing</span></a>
+  <a href="#"><i data-lucide="settings" style="width:20px;height:20px;"></i><span>Settings</span></a>
+</nav>
+
+<!-- WALK-IN MODAL -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div id="modal">
+    <div class="mh">
+      <h2 id="modal-title">Add Walk-in</h2>
+      <button class="mc" onclick="closeModal()"><i data-lucide="x" style="width:15px;height:15px;"></i></button>
+    </div>
+    <div class="mb" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+/* ══ DATA ══ */
+const FIRST = ['Chioma','Femi','Ngozi','Emeka','Kemi','Blessing','Tunde','Grace','Ibrahim','Amara','Sade','Yemi','Rita','Damilola','Funke'];
+const LAST  = ['Eze','Adeyemi','Nnadi','Chukwu','Adeoye','Obi','Fashola','Nwachukwu','Musa','Okonkwo','Williams','Nwosu','Lawal','Adeleke','Bello'];
+const TYPES = ['Consultation','Follow-up','Walk-in','Lab Review','Emergency'];
+const CONDITIONS = ['Hypertension','Diabetes Type 2','Malaria','Asthma','Gastritis','None'];
+const AV_COLORS  = ['#4A7C59','#E8927C','#C9A84C','#8A9BB0','#6BA37A','#2F5C3A','#c97058','#6A3D85'];
+function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+function rndInt(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function initials(n){ return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function timeStr(h,m){ const ap=h>=12?'PM':'AM',hh=h>12?h-12:h||12; return `${hh}:${String(m).padStart(2,'0')} ${ap}`; }
+function now(){ return new Date(); }
+
+/* Queue data */
+let queue = [];
+let completedList = [];
+let activePatientId = null;
+let currentDrugs = [];
+let currentLabs  = [];
+let timerInterval = null;
+let timerSeconds  = 0;
+let currentQTab   = 'waiting';
+let unsaved = false;
+
+function generateQueue(){
+  const entries = [];
+  const waitTimes = [5,12,18,24,31,7,42];
+  for(let i=0;i<7;i++){
+    const n = `${rnd(FIRST)} ${rnd(LAST)}`;
+    entries.push({
+      id: 2000+i, name:n, age:rndInt(10,78), blood:rnd(['A+','O+','B+','AB+']),
+      type:rnd(TYPES), doctor:'Dr. Adaeze',
+      condition:rnd(CONDITIONS), allergy:rnd(['Penicillin','None','None','None','Aspirin','None']),
+      color:AV_COLORS[i%AV_COLORS.length],
+      waitMins:waitTimes[i], status:'waiting',
+      apptTime:timeStr(8+i,i%2===0?0:30),
+      vitals:{ bp:`${rndInt(110,158)}/${rndInt(70,98)}`, hr:rndInt(60,100), temp:(36+Math.random()).toFixed(1), weight:rndInt(48,105), spo2:rndInt(96,100) },
+      bpHigh: Math.random()<0.3,
+      history: [
+        { date:'Feb 4, 2026', type:'Follow-up', doctor:'Dr. Bello', note:'BP reviewed. Continue medication.' },
+        { date:'Jan 10, 2026', type:'Consultation', doctor:'Dr. Adaeze', note:'Initial presentation. Labs ordered.' },
+      ]
+    });
+  }
+  return entries;
+}
+queue = generateQueue();
+
+/* ══ QUEUE RENDER ══ */
+function renderQueue(){
+  const el = document.getElementById('queue-list');
+  const docFilter = document.getElementById('doctor-select').value;
+  const filtered = queue.filter(p => {
+    const matchDoc = docFilter === 'all' || p.doctor === docFilter;
+    if(currentQTab==='waiting')  return matchDoc && p.status==='waiting';
+    if(currentQTab==='active')   return matchDoc && p.status==='active';
+    if(currentQTab==='done')     return matchDoc && (p.status==='completed'||p.status==='cancelled');
+    return matchDoc;
+  });
+
+  const waiting = queue.filter(p=>p.status==='waiting').length;
+  document.getElementById('queue-count-badge').textContent = `${waiting} waiting`;
+
+  if(!filtered.length){
+    el.innerHTML = `<div style="text-align:center;padding:32px 16px;color:var(--slate);font-size:13px;">No patients in this queue</div>`;
+    return;
+  }
+
+  el.innerHTML = filtered.map((p,i) => {
+    const isActive = p.id === activePatientId;
+    const statusColor = { waiting:'var(--slate)', active:'var(--sage)', completed:'#4A6580', cancelled:'var(--blush)' }[p.status];
+    return `<div class="q-item${isActive?' active-consult':''}" onclick="selectPatient(${p.id})">
+      <div class="q-num">${p.status==='waiting'?i+1:p.status==='active'?'▶':p.status==='completed'?'✓':'✕'}</div>
+      <div class="q-av" style="background:${p.color};">${initials(p.name)}</div>
+      <div class="q-info">
+        <div class="q-name">${p.name}</div>
+        <div class="q-meta">${p.type} · ${p.apptTime}</div>
+        ${p.status==='waiting'?`<div class="q-wait">Wait: ~${p.waitMins}min</div>`:''}
+        ${p.status==='completed'?`<div style="font-size:10px;color:var(--sage);font-weight:600;">✓ Completed</div>`:''}
+        ${p.status==='active'?`<div style="font-size:10px;color:var(--sage);font-weight:700;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;background:var(--sage);border-radius:50%;animation:pdot 2s infinite;display:inline-block;"></span>In Consultation</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  lucide.createIcons();
+}
+
+function setQTab(btn, tab){
+  currentQTab = tab;
+  document.querySelectorAll('.qtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderQueue();
+}
+
+function filterQueue(){ renderQueue(); }
+
+/* ══ SELECT PATIENT & START CONSULTATION ══ */
+function selectPatient(id){
+  if(activePatientId && activePatientId !== id){
+    if(!confirm('End current consultation and switch to this patient?')) return;
+    endConsultation(false);
+  }
+
+  const p = queue.find(x=>x.id===id);
+  if(!p) return;
+  if(p.status==='completed'){ showHistory(p); return; }
+
+  // Set active
+  activePatientId = id;
+  p.status = 'active';
+
+  // Update UI
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('patient-banner').style.display='block';
+  document.getElementById('vitals-bar').style.display='flex';
+  document.getElementById('notes-workspace').style.display='block';
+  document.getElementById('save-bar').style.display='flex';
+  document.getElementById('live-badge').style.display='flex';
+  document.getElementById('consult-timer').style.display='block';
+
+  // Banner
+  const av = document.getElementById('banner-av');
+  av.style.background = p.color;
+  av.textContent = initials(p.name);
+  document.getElementById('banner-name').textContent = p.name;
+  document.getElementById('banner-meta').innerHTML = `
+    <span class="banner-chip"><i data-lucide="user" style="width:11px;height:11px;"></i> ${p.age}y · ${p.blood}</span>
+    <span class="banner-chip"><i data-lucide="stethoscope" style="width:11px;height:11px;"></i> ${p.doctor}</span>
+    <span class="banner-chip"><i data-lucide="tag" style="width:11px;height:11px;"></i> ${p.type}</span>
+    ${p.condition!=='None'?`<span class="banner-chip warn">${p.condition}</span>`:''}
+    ${p.allergy!=='None'?`<span class="banner-chip alert">⚠ ${p.allergy}</span>`:''}
+  `;
+
+  // Vitals bar
+  const bp = p.vitals.bp;
+  const bpHigh = parseInt(bp)>140;
+  document.getElementById('vp-bp-val').textContent = bp;
+  document.getElementById('vp-bp').className = `vital-pill${bpHigh?' alert':''}`;
+  document.getElementById('vp-hr-val').textContent = p.vitals.hr;
+  document.getElementById('vp-temp-val').textContent = p.vitals.temp+'°C';
+  document.getElementById('vp-weight-val').textContent = p.vitals.weight+'kg';
+  document.getElementById('vp-spo2-val').textContent = p.vitals.spo2+'%';
+
+  // Pre-fill vitals inputs
+  document.getElementById('o-bp').value     = bp;
+  document.getElementById('o-hr').value     = p.vitals.hr;
+  document.getElementById('o-temp').value   = p.vitals.temp;
+  document.getElementById('o-weight').value = p.vitals.weight;
+  document.getElementById('o-spo2').value   = p.vitals.spo2;
+
+  // Pre-fill allergy
+  document.getElementById('s-allergy').value = p.allergy !== 'None' ? p.allergy : '';
+  if(p.condition!=='None') document.getElementById('s-pmh').value = p.condition;
+
+  // History
+  renderHistory(p);
+  currentDrugs = []; currentLabs = [];
+  renderDrugs(); renderLabs();
+
+  // Timer
+  timerSeconds = 0;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    timerSeconds++;
+    const m=String(Math.floor(timerSeconds/60)).padStart(2,'0');
+    const s=String(timerSeconds%60).padStart(2,'0');
+    document.getElementById('consult-timer').textContent=`${m}:${s}`;
+  },1000);
+
+  // Scroll workspace to top
+  document.getElementById('notes-workspace').scrollTop=0;
+  unsaved = false;
+  document.getElementById('save-bar').style.background='var(--sage-pale)';
+
+  // Close mobile queue
+  if(window.innerWidth<640) { document.getElementById('queue-panel').classList.remove('open'); }
+
+  renderQueue();
+  lucide.createIcons();
+}
+
+/* ══ VITALS PILL LIVE UPDATE ══ */
+function updateVitalPill(key, val){
+  const map = { bp:'vp-bp-val', hr:'vp-hr-val', temp:'vp-temp-val', weight:'vp-weight-val', spo2:'vp-spo2-val' };
+  const suffix = { bp:'', hr:'', temp:'°C', weight:'kg', spo2:'%' };
+  const el = document.getElementById(map[key]);
+  if(el) el.textContent = val + (suffix[key]||'');
+  if(key==='bp'){
+    const pill = document.getElementById('vp-bp');
+    if(pill) pill.className = `vital-pill${parseInt(val)>140?' alert':''}`;
+  }
+}
+
+/* ══ SOAP TOGGLE ══ */
+function toggleSoap(sec){
+  document.getElementById('sec-'+sec).classList.toggle('soap-collapsed');
+}
+
+/* ══ SEVERITY ══ */
+function setSeverity(btn, level){
+  document.querySelectorAll('.soap-sev-btn').forEach(b=>{
+    b.style.background='#fff'; b.style.color='var(--ink)'; b.style.borderColor='var(--border)';
+  });
+  const colors = { mild:['#E8F2EB','#2F5C3A'], moderate:['#FBF6E9','#8b6a1a'], severe:['#FAF0ED','#c05c3c'], critical:['#1a0a0a','#E8927C'] };
+  const [bg,fg] = colors[level]||['#fff','var(--ink)'];
+  btn.style.background=bg; btn.style.color=fg; btn.style.borderColor=fg;
+  markUnsaved();
+}
+
+/* ══ PRESCRIPTIONS ══ */
+function addDrug(){
+  const name = document.getElementById('rx-drug').value.trim();
+  const freq = document.getElementById('rx-freq').value;
+  const dur  = document.getElementById('rx-dur').value.trim();
+  const note = document.getElementById('rx-note').value.trim();
+  if(!name||!freq){ alert('Enter drug name and frequency.'); return; }
+  currentDrugs.push({ id:Date.now(), name, freq, dur:dur||'—', note });
+  document.getElementById('rx-drug').value='';
+  document.getElementById('rx-freq').value='';
+  document.getElementById('rx-dur').value='';
+  document.getElementById('rx-note').value='';
+  renderDrugs(); markUnsaved();
+}
+
+function renderDrugs(){
+  const el = document.getElementById('drug-list');
+  if(!currentDrugs.length){
+    el.innerHTML=`<div style="text-align:center;padding:24px 12px;color:var(--slate);font-size:12px;">No medications added yet.</div>`;
+    return;
+  }
+  el.innerHTML = currentDrugs.map(d=>`
+    <div class="drug-item">
+      <div class="drug-icon"><i data-lucide="pill" style="width:16px;height:16px;color:var(--sage);"></i></div>
+      <div style="flex:1;min-width:0;">
+        <div class="drug-name">${d.name}</div>
+        <div class="drug-dose">${d.freq} · ${d.dur}${d.note?` · ${d.note}`:''}</div>
+      </div>
+      <button class="drug-remove" onclick="removeDrug(${d.id})"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button>
+    </div>`).join('');
+  lucide.createIcons();
+}
+
+function removeDrug(id){ currentDrugs=currentDrugs.filter(d=>d.id!==id); renderDrugs(); markUnsaved(); }
+
+/* ══ LAB REQUESTS ══ */
+function addLab(){
+  const name=document.getElementById('lab-input').value.trim();
+  if(!name){alert('Enter test name.');return;}
+  currentLabs.push({id:Date.now(),name});
+  document.getElementById('lab-input').value='';
+  renderLabs(); markUnsaved();
+}
+
+function renderLabs(){
+  const el=document.getElementById('lab-list');
+  if(!currentLabs.length){
+    el.innerHTML=`<div style="text-align:center;padding:24px 12px;color:var(--slate);font-size:12px;">No lab tests requested yet.</div>`;
+    return;
+  }
+  el.innerHTML=currentLabs.map(l=>`
+    <div class="lab-item">
+      <div style="width:30px;height:30px;border-radius:8px;background:var(--gold-pale);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="flask-conical" style="width:14px;height:14px;color:var(--gold);"></i></div>
+      <span class="lab-item-name">${l.name}</span>
+      <button class="lab-remove" onclick="removeLab(${l.id})"><i data-lucide="x" style="width:13px;height:13px;"></i></button>
+    </div>`).join('');
+  lucide.createIcons();
+}
+
+function removeLab(id){ currentLabs=currentLabs.filter(l=>l.id!==id); renderLabs(); markUnsaved(); }
+
+/* ══ HISTORY IN RX PANEL ══ */
+function renderHistory(p){
+  const el=document.getElementById('hist-content');
+  if(!p||!p.history||!p.history.length){ el.innerHTML=`<div style="text-align:center;padding:24px;color:var(--slate);font-size:12px;">No previous consultations.</div>`; return; }
+  el.innerHTML=p.history.map(h=>`
+    <div class="hist-item">
+      <div class="hist-date">${h.date}</div>
+      <div class="hist-type">${h.type}</div>
+      <div class="hist-doctor">${h.doctor}</div>
+      <div class="hist-note-preview">${h.note}</div>
+    </div>`).join('');
+}
+
+function showHistory(p){
+  renderHistory(p);
+  switchRxTab(document.querySelector('.rx-tab:last-child'),'tab-history');
+}
+
+/* ══ UNSAVED ══ */
+function markUnsaved(){
+  unsaved=true;
+  document.getElementById('save-bar').style.background='#FBF6E9';
+  document.getElementById('save-bar').querySelector('p').textContent='Unsaved changes';
+  document.getElementById('save-bar').querySelector('p').style.color='#8b6a1a';
+  lucide.createIcons();
+}
+
+function saveNotes(){
+  unsaved=false;
+  document.getElementById('save-bar').style.background='var(--sage-pale)';
+  document.getElementById('save-bar').querySelector('p').textContent='Notes saved ✓';
+  document.getElementById('save-bar').querySelector('p').style.color='var(--sage-dark)';
+  setTimeout(()=>{ if(!unsaved) document.getElementById('save-bar').querySelector('p').textContent='All notes saved'; },2000);
+}
+
+/* ══ END / COMPLETE ══ */
+function endConsultation(confirm_=true){
+  if(confirm_ && unsaved && !confirm('End consultation without saving notes?')) return;
+  const p=queue.find(x=>x.id===activePatientId);
+  if(p) p.status='waiting';
+  resetWorkspace();
+}
+
+function completeConsultation(){
+  if(unsaved && !confirm('Complete consultation? Unsaved notes will be lost.')) return;
+  const p=queue.find(x=>x.id===activePatientId);
+  if(p){
+    p.status='completed';
+    completedList.push(p);
+    // Auto-generate invoice prompt
+    const drugs = currentDrugs.length;
+    const labs  = currentLabs.length;
+    if(drugs||labs){ setTimeout(()=>alert(`Consultation complete!\n\nPrescription: ${drugs} medication(s)\nLab requests: ${labs} test(s)\n\nAn invoice has been created for ${p.name}.`),100); }
+  }
+  resetWorkspace();
+}
+
+function resetWorkspace(){
+  activePatientId=null;
+  clearInterval(timerInterval);
+  timerSeconds=0;
+  document.getElementById('consult-timer').textContent='00:00';
+  document.getElementById('empty-state').style.display='flex';
+  document.getElementById('patient-banner').style.display='none';
+  document.getElementById('vitals-bar').style.display='none';
+  document.getElementById('notes-workspace').style.display='none';
+  document.getElementById('save-bar').style.display='none';
+  document.getElementById('live-badge').style.display='none';
+  document.getElementById('consult-timer').style.display='none';
+  // Clear SOAP
+  ['s-complaint','s-hpi','s-pmh','s-meds','s-allergy','o-bp','o-hr','o-temp','o-weight','o-spo2','o-rr','o-exam','a-dx','a-dx2','a-notes','p-plan','p-followup','p-refer','p-instructions'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value='';
+  });
+  document.querySelectorAll('.soap-sev-btn').forEach(b=>{ b.style.background='#fff'; b.style.color='var(--ink)'; b.style.borderColor='var(--border)'; });
+  currentDrugs=[]; currentLabs=[];
+  renderDrugs(); renderLabs();
+  document.getElementById('hist-content').innerHTML='';
+  renderQueue();
+}
+
+/* ══ WALK-IN MODAL ══ */
+function openWalkinModal(){
+  document.getElementById('modal-title').textContent='Add Walk-in Patient';
+  document.getElementById('modal-body').innerHTML=`
+    <div class="mrow">
+      <div class="mf"><label>First Name</label><input type="text" id="wk-fn" placeholder="Adaeze"/></div>
+      <div class="mf"><label>Last Name</label><input type="text" id="wk-ln" placeholder="Obi"/></div>
+    </div>
+    <div class="mrow">
+      <div class="mf"><label>Age</label><input type="number" id="wk-age" placeholder="35" min="0" max="120"/></div>
+      <div class="mf"><label>Blood Group</label>
+        <select id="wk-blood"><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+      </div>
+    </div>
+    <div class="mrow">
+      <div class="mf"><label>Visit Type</label>
+        <select id="wk-type"><option>Walk-in</option><option>Consultation</option><option>Emergency</option><option>Follow-up</option></select>
+      </div>
+      <div class="mf"><label>Assign Doctor</label>
+        <select id="wk-doc"><option>Dr. Adaeze</option><option>Dr. Bello</option><option>Dr. Okafor</option><option>Dr. Yusuf</option></select>
+      </div>
+    </div>
+    <div class="mf"><label>Chief Complaint</label><input type="text" id="wk-cc" placeholder="e.g. Headache and fever for 2 days"/></div>
+    <div class="mf"><label>Known Condition / Allergy</label><input type="text" id="wk-cond" placeholder="e.g. Hypertension, Penicillin allergy"/></div>
+    <div class="macts">
+      <button class="mbtn-c" onclick="closeModal()">Cancel</button>
+      <button class="mbtn-s" onclick="saveWalkin()">Add to Queue</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function saveWalkin(){
+  const fn=document.getElementById('wk-fn').value.trim();
+  const ln=document.getElementById('wk-ln').value.trim();
+  if(!fn||!ln){alert('Enter patient name.');return;}
+  const age=parseInt(document.getElementById('wk-age').value)||0;
+  const blood=document.getElementById('wk-blood').value;
+  const type=document.getElementById('wk-type').value;
+  const doc=document.getElementById('wk-doc').value;
+  const cc=document.getElementById('wk-cc').value.trim();
+  const cond=document.getElementById('wk-cond').value.trim();
+  const now=new Date();
+  queue.push({
+    id:Date.now(), name:`${fn} ${ln}`, age, blood, type, doctor:doc,
+    condition:cond||'None', allergy:'None', color:rnd(AV_COLORS),
+    waitMins:0, status:'waiting',
+    apptTime:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),
+    vitals:{ bp:'—',hr:'—',temp:'—',weight:'—',spo2:'—' }, bpHigh:false,
+    history:[]
+  });
+  closeModal();
+  currentQTab='waiting';
+  document.querySelectorAll('.qtab').forEach((b,i)=>{b.classList.toggle('active',i===0);});
+  renderQueue();
+}
+
+function openLabModal(){
+  if(!activePatientId){alert('Start a consultation first.');return;}
+  switchRxTab(document.querySelectorAll('.rx-tab')[1],'tab-labs');
+  document.getElementById('lab-input').focus();
+}
+
+/* ══ RX TABS ══ */
+function switchRxTab(btn,tabId){
+  document.querySelectorAll('.rx-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.rx-tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+
+/* ══ MODAL ══ */
+function closeModal(e){
+  if(e&&e.target!==document.getElementById('modal-overlay'))return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+/* ══ SIDEBAR ══ */
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('overlay').onclick=closeSidebar;
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('queue-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+/* ══ MOBILE QUEUE ══ */
+function toggleQueue(){
+  document.getElementById('queue-panel').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+  document.getElementById('overlay').onclick=()=>{ document.getElementById('queue-panel').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); };
+}
+
+/* ══ RESPONSIVE ══ */
+function applyResponsive(){
+  const w=window.innerWidth;
+  document.getElementById('add-lbl').textContent=w<540?'Walk-in':'Add Walk-in';
+}
+window.addEventListener('resize',applyResponsive);
+
+/* ══ INIT ══ */
+renderQueue();
+renderDrugs();
+renderLabs();
+applyResponsive();
+</script>
+</body>
+</html>

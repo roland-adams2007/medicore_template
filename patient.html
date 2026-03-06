@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Patients</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink:        #0D1117;
+      --paper:      #F7F4EF;
+      --sage:       #4A7C59;
+      --sage-light: #6BA37A;
+      --sage-dark:  #2F5C3A;
+      --sage-pale:  #E8F2EB;
+      --blush:      #E8927C;
+      --blush-pale: #FAF0ED;
+      --gold:       #C9A84C;
+      --gold-pale:  #FBF6E9;
+      --slate:      #8A9BB0;
+      --slate-pale: #EEF2F7;
+      --border:     rgba(13,17,23,0.09);
+      --sidebar-w:  260px;
+      --detail-w:   380px;
+    }
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); overflow: hidden; }
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ══ SIDEBAR ══ */
+    #sidebar {
+      width: var(--sidebar-w); background: var(--ink);
+      display: flex; flex-direction: column; flex-shrink: 0;
+      height: 100vh; overflow-y: auto;
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); z-index: 50;
+    }
+    @media (max-width: 1023px) {
+      #sidebar { position: fixed; top:0; left:0; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0,0,0,0.3); }
+    }
+    #overlay { display:none; position:fixed; inset:0; background:rgba(13,17,23,0.45); backdrop-filter:blur(2px); z-index:40; }
+    #overlay.show { display:block; }
+    .nav-item {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 12px; border-radius:12px;
+      color:#8A9BB0; text-decoration:none; font-size:14px;
+      transition:background 0.15s,color 0.15s;
+      border-left:3px solid transparent;
+    }
+    .nav-item:hover { background:rgba(74,124,89,0.15); color:#fff; }
+    .nav-item.active { background:rgba(74,124,89,0.22); color:#fff; border-left-color:var(--sage); }
+
+    /* ══ MAIN ══ */
+    #main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ══ TOPBAR ══ */
+    #topbar {
+      background:rgba(247,244,239,0.95); backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+      padding:12px 20px; display:flex; align-items:center; gap:10px;
+      flex-shrink:0;
+    }
+    #ham-btn { width:38px; height:38px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid var(--border); border-radius:10px; cursor:pointer; flex-shrink:0; }
+    @media (min-width:1024px) { #ham-btn { display:none; } }
+    .top-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--ink); white-space:nowrap; }
+
+    /* Search */
+    .search-wrap { position:relative; flex:1; max-width:360px; }
+    .search-wrap i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--slate); pointer-events:none; width:16px; height:16px; }
+    .search-wrap input {
+      width:100%; padding:9px 14px 9px 38px;
+      font-size:13px; font-family:'DM Sans',sans-serif;
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      outline:none; color:var(--ink); transition:border-color 0.15s,box-shadow 0.15s;
+    }
+    .search-wrap input:focus { border-color:var(--sage); box-shadow:0 0 0 3px rgba(74,124,89,0.1); }
+    .search-wrap input::placeholder { color:#B8C0CC; }
+
+    /* Filter chips */
+    .filter-chips { display:flex; gap:6px; flex-shrink:0; }
+    .chip-btn {
+      padding:6px 12px; font-size:12px; font-weight:600;
+      border:1px solid var(--border); border-radius:8px;
+      background:#fff; color:var(--slate); cursor:pointer;
+      white-space:nowrap; transition:all 0.15s;
+      font-family:'DM Sans',sans-serif;
+    }
+    .chip-btn.active { background:var(--sage); color:#fff; border-color:var(--sage); }
+    .chip-btn:hover:not(.active) { border-color:var(--sage); color:var(--sage-dark); }
+
+    .btn-add-patient {
+      display:flex; align-items:center; gap:6px;
+      padding:9px 16px; background:var(--sage); color:#fff;
+      font-size:13px; font-weight:600; border:none; border-radius:10px;
+      cursor:pointer; font-family:'DM Sans',sans-serif; white-space:nowrap;
+      transition:all 0.15s; margin-left:auto; flex-shrink:0;
+    }
+    .btn-add-patient:hover { background:var(--sage-dark); box-shadow:0 4px 14px rgba(47,92,58,0.3); }
+
+    /* ══ BODY SPLIT ══ */
+    #body { flex:1; display:flex; overflow:hidden; }
+
+    /* ══ PATIENT LIST ══ */
+    #list-panel {
+      flex:1; min-width:0; display:flex; flex-direction:column;
+      overflow:hidden; border-right:1px solid var(--border);
+    }
+
+    /* Stats row */
+    #stats-row { display:flex; gap:1px; background:var(--border); border-bottom:1px solid var(--border); flex-shrink:0; }
+    .stat-chip { flex:1; background:#fff; padding:14px 16px; text-align:center; }
+    .stat-chip:hover { background:var(--sage-pale); }
+    .stat-val   { font-family:'DM Serif Display',serif; font-size:24px; color:var(--ink); line-height:1; }
+    .stat-val span { color:var(--sage); }
+    .stat-lbl   { font-size:11px; color:var(--slate); margin-top:3px; }
+
+    /* Table header */
+    .table-header {
+      display:grid; padding:10px 16px;
+      border-bottom:1px solid var(--border); background:#fff;
+      flex-shrink:0; gap:8px;
+    }
+    .th { font-size:11px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; }
+    .th:hover { color:var(--ink); }
+    .th.sorted { color:var(--sage); }
+
+    /* Patient rows */
+    #patient-list { flex:1; overflow-y:auto; }
+    .patient-row {
+      display:grid; padding:12px 16px; gap:8px;
+      border-bottom:1px solid rgba(13,17,23,0.05);
+      cursor:pointer; transition:background 0.12s;
+      align-items:center;
+    }
+    .patient-row:hover { background:rgba(247,244,239,0.8); }
+    .patient-row.selected { background:var(--sage-pale); }
+    .patient-row:last-child { border-bottom:none; }
+
+    .p-avatar {
+      width:36px; height:36px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; color:#fff; flex-shrink:0;
+    }
+    .p-name { font-size:14px; font-weight:600; color:var(--ink); line-height:1.2; }
+    .p-id   { font-size:11px; color:var(--slate); margin-top:1px; }
+    .p-meta { font-size:12px; color:var(--slate); }
+    .p-last { font-size:12px; color:var(--slate); }
+    .p-status-col { display:flex; justify-content:flex-end; }
+
+    .badge { font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; white-space:nowrap; }
+    .b-active    { background:var(--sage-pale); color:var(--sage-dark); }
+    .b-new       { background:#F5F0F8; color:#6A3D85; }
+    .b-inactive  { background:var(--slate-pale); color:#4A6580; }
+    .b-critical  { background:var(--blush-pale); color:#c05c3c; }
+
+    /* Empty state */
+    .empty-state { text-align:center; padding:60px 24px; color:var(--slate); }
+    .empty-state p { font-size:14px; margin-top:8px; }
+
+    /* ══ DETAIL PANEL ══ */
+    #detail-panel {
+      width:var(--detail-w); flex-shrink:0;
+      display:flex; flex-direction:column;
+      background:#fff; overflow:hidden;
+      border-left:1px solid var(--border);
+      transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    #detail-panel.hidden { display:none; }
+
+    @media (max-width:1100px) {
+      #detail-panel {
+        position:fixed; right:0; top:0; bottom:0;
+        z-index:60; box-shadow:-4px 0 32px rgba(13,17,23,0.12);
+        transform:translateX(100%);
+      }
+      #detail-panel.visible { transform:translateX(0); }
+    }
+
+    .detail-close {
+      width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+      background:var(--paper); border:none; border-radius:8px; cursor:pointer;
+      color:var(--slate); transition:all 0.15s; flex-shrink:0;
+    }
+    .detail-close:hover { background:var(--blush-pale); color:var(--blush); }
+
+    /* Detail tabs */
+    .detail-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); flex-shrink:0; background:#fff; }
+    .detail-tab {
+      flex:1; padding:12px 8px; font-size:12px; font-weight:600;
+      color:var(--slate); cursor:pointer; text-align:center;
+      border:none; background:none; font-family:'DM Sans',sans-serif;
+      border-bottom:2px solid transparent; transition:all 0.15s;
+    }
+    .detail-tab.active { color:var(--sage); border-bottom-color:var(--sage); }
+    .detail-tab:hover:not(.active) { color:var(--ink); background:var(--paper); }
+    .detail-tab-content { display:none; }
+    .detail-tab-content.active { display:block; }
+
+    .detail-scroll { flex:1; overflow-y:auto; }
+    .detail-section { padding:16px; border-bottom:1px solid var(--border); }
+    .detail-section:last-child { border-bottom:none; }
+    .ds-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--slate); margin-bottom:12px; }
+
+    /* Vitals grid */
+    .vitals-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .vital-card { padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--paper); }
+    .vital-card.alert { border-color:var(--blush); background:var(--blush-pale); }
+    .vc-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--slate); margin-bottom:3px; }
+    .vital-card.alert .vc-label { color:var(--blush); }
+    .vc-val { font-family:'DM Serif Display',serif; font-size:22px; color:var(--ink); line-height:1; }
+    .vc-sub { font-size:10px; color:var(--slate); margin-top:3px; }
+    .vital-card.alert .vc-sub { color:var(--blush); }
+
+    /* Visit timeline */
+    .visit-row { display:flex; gap:10px; }
+    .vr-left { display:flex; flex-direction:column; align-items:center; flex-shrink:0; }
+    .vr-dot { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .vr-line { width:1.5px; flex:1; background:var(--border); min-height:16px; }
+    .vr-body { padding-bottom:16px; flex:1; min-width:0; }
+    .vr-title { font-size:13px; font-weight:600; color:var(--ink); }
+    .vr-meta  { font-size:11px; color:var(--slate); margin-top:2px; line-height:1.5; }
+    .vr-date  { font-size:10px; color:rgba(138,155,176,0.6); margin-top:3px; }
+
+    /* Prescriptions */
+    .rx-row { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border); }
+    .rx-row:last-child { border-bottom:none; }
+    .rx-icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .rx-name { font-size:13px; font-weight:600; color:var(--ink); }
+    .rx-meta { font-size:11px; color:var(--slate); margin-top:2px; }
+    .rx-status { margin-left:auto; flex-shrink:0; }
+    .prog { height:5px; background:var(--border); border-radius:100px; overflow:hidden; margin-top:6px; }
+    .prog-fill { height:100%; border-radius:100px; }
+
+    /* Lab results */
+    .lab-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+    .lab-row:last-child { border-bottom:none; }
+    .lab-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .lab-name { font-size:13px; font-weight:500; color:var(--ink); flex:1; min-width:0; }
+    .lab-meta { font-size:11px; color:var(--slate); margin-top:1px; }
+    .lab-status { flex-shrink:0; }
+
+    /* Action buttons */
+    .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .action-btn {
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+      padding:12px 8px; background:var(--paper); border:1px solid var(--border);
+      border-radius:10px; cursor:pointer; font-size:11px; font-weight:600;
+      color:var(--slate); transition:all 0.15s; font-family:'DM Sans',sans-serif;
+    }
+    .action-btn:hover { border-color:var(--sage); background:var(--sage-pale); color:var(--sage-dark); }
+    .action-btn:hover i { color:var(--sage) !important; }
+
+    /* ══ MODAL ══ */
+    #modal-overlay { display:none; position:fixed; inset:0; background:rgba(13,17,23,0.5); backdrop-filter:blur(4px); z-index:200; align-items:center; justify-content:center; padding:20px; }
+    #modal-overlay.open { display:flex; }
+    #modal { background:#fff; border-radius:20px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(13,17,23,0.25); animation:modalIn 0.22s ease; }
+    @keyframes modalIn { from{opacity:0;transform:scale(0.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)} }
+    .modal-header { padding:22px 22px 0; display:flex; align-items:center; justify-content:space-between; }
+    .modal-title  { font-family:'DM Serif Display',serif; font-size:21px; color:var(--ink); }
+    .modal-close  { width:32px; height:32px; background:var(--paper); border:none; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--slate); }
+    .modal-close:hover { background:var(--blush-pale); color:var(--blush); }
+    .modal-body   { padding:18px 22px 22px; }
+    .m-field { margin-bottom:14px; }
+    .m-field label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink); margin-bottom:6px; }
+    .m-field input, .m-field select, .m-field textarea {
+      width:100%; padding:10px 12px; font-size:14px; font-family:'DM Sans',sans-serif;
+      background:var(--paper); border:1.5px solid var(--border); border-radius:10px;
+      outline:none; color:var(--ink); transition:border-color 0.15s,box-shadow 0.15s; -webkit-appearance:none;
+    }
+    .m-field input:focus, .m-field select:focus, .m-field textarea:focus { border-color:var(--sage); box-shadow:0 0 0 3px rgba(74,124,89,0.1); background:#fff; }
+    .m-field input::placeholder, .m-field textarea::placeholder { color:#B8C0CC; }
+    .m-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .m-actions { display:flex; gap:10px; margin-top:18px; }
+    .btn-cancel-m { flex:1; padding:11px; background:var(--paper); border:1.5px solid var(--border); border-radius:10px; font-size:13px; font-weight:600; color:var(--slate); cursor:pointer; font-family:'DM Sans',sans-serif; }
+    .btn-save-m { flex:2; padding:11px; background:var(--sage); border:none; border-radius:10px; font-size:13px; font-weight:600; color:#fff; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.15s; }
+    .btn-save-m:hover { background:var(--sage-dark); }
+
+    /* ══ SCROLLBARS ══ */
+    ::-webkit-scrollbar { width:4px; height:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#C8C4BC; border-radius:100px; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
+    .patient-row { animation:fadeUp 0.2s ease both; }
+
+    /* ══ BOTTOM NAV ══ */
+    #bottom-nav { position:fixed; bottom:0; left:0; right:0; background:var(--ink); border-top:1px solid rgba(255,255,255,0.08); display:flex; z-index:45; padding-bottom:env(safe-area-inset-bottom,0); }
+    @media (min-width:1024px) { #bottom-nav { display:none; } }
+    #bottom-nav a { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 8px; color:#8A9BB0; font-size:10px; text-decoration:none; transition:color 0.15s; }
+    #bottom-nav a.active, #bottom-nav a:hover { color:var(--sage); }
+
+    /* grid columns */
+    .grid-cols { grid-template-columns: 36px 1fr 100px 90px 80px 70px; }
+    @media (max-width:860px) { .grid-cols { grid-template-columns: 36px 1fr 80px 60px; } }
+    @media (max-width:600px) { .grid-cols { grid-template-columns: 36px 1fr 60px; } }
+    @media (max-width:400px) { .grid-cols { grid-template-columns: 36px 1fr; } }
+
+    /* hide cols responsively */
+    .col-doctor, .col-last { }
+    .col-blood, .col-age   { }
+    @media (max-width:860px) { .col-doctor { display:none; } .col-blood { display:none; } }
+    @media (max-width:600px) { .col-last   { display:none; } .col-age   { display:none; } }
+    @media (max-width:400px) { .col-status { display:none; } }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside id="sidebar">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#4A7C59,#2F5C3A);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="activity" style="width:18px;height:18px;color:#fff;"></i>
+        </div>
+        <div>
+          <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1;">MediCore</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:2px;">Clinic Admin</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#8A9BB0;background:rgba(255,255,255,0.06);border:none;border-radius:8px;cursor:pointer;">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:12px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;">GH</div>
+        <div style="flex:1;min-width:0;">
+          <p style="color:#fff;font-size:13px;font-weight:600;">Grace Health Clinic</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:1px;">Dr. Adaeze Obi · Admin</p>
+        </div>
+      </div>
+    </div>
+    <nav style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:2px;">
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:6px 12px;">Main</p>
+      <a href="#" class="nav-item"><i data-lucide="layout-dashboard" style="width:16px;height:16px;flex-shrink:0;"></i>Dashboard</a>
+      <a href="#" class="nav-item"><i data-lucide="calendar-days" style="width:16px;height:16px;flex-shrink:0;"></i>Appointments</a>
+      <a href="#" class="nav-item active"><i data-lucide="users" style="width:16px;height:16px;flex-shrink:0;"></i>Patients</a>
+      <a href="#" class="nav-item"><i data-lucide="stethoscope" style="width:16px;height:16px;flex-shrink:0;"></i>Doctors</a>
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:14px 12px 6px;">Clinical</p>
+      <a href="#" class="nav-item"><i data-lucide="file-heart" style="width:16px;height:16px;flex-shrink:0;"></i>Medical Records</a>
+      <a href="#" class="nav-item"><i data-lucide="pill" style="width:16px;height:16px;flex-shrink:0;"></i>Prescriptions</a>
+      <a href="#" class="nav-item"><i data-lucide="flask-conical" style="width:16px;height:16px;flex-shrink:0;"></i>Lab Results</a>
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:14px 12px 6px;">Admin</p>
+      <a href="#" class="nav-item"><i data-lucide="receipt" style="width:16px;height:16px;flex-shrink:0;"></i>Billing</a>
+      <a href="#" class="nav-item"><i data-lucide="bar-chart-2" style="width:16px;height:16px;flex-shrink:0;"></i>Reports</a>
+      <a href="#" class="nav-item"><i data-lucide="settings" style="width:16px;height:16px;flex-shrink:0;"></i>Settings</a>
+    </nav>
+    <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">AO</div>
+      <div style="flex:1;min-width:0;"><p style="color:#fff;font-size:13px;font-weight:500;">Dr. Adaeze Obi</p><p style="color:#8A9BB0;font-size:11px;">Clinic Admin</p></div>
+      <button style="background:none;border:none;color:#8A9BB0;cursor:pointer;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#8A9BB0'"><i data-lucide="log-out" style="width:15px;height:15px;"></i></button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <button id="ham-btn" onclick="openSidebar()" style="background:#fff;border:1px solid var(--border);border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+        <i data-lucide="menu" style="width:17px;height:17px;color:var(--ink);"></i>
+      </button>
+      <span class="top-title">Patients</span>
+      <div class="search-wrap">
+        <i data-lucide="search"></i>
+        <input type="text" id="search-input" placeholder="Search by name, ID, phone…" oninput="applyFilters()"/>
+      </div>
+      <div class="filter-chips" id="filter-chips">
+        <button class="chip-btn active" data-filter="all"      onclick="setFilter(this)">All</button>
+        <button class="chip-btn"        data-filter="active"   onclick="setFilter(this)">Active</button>
+        <button class="chip-btn"        data-filter="new"      onclick="setFilter(this)">New</button>
+        <button class="chip-btn"        data-filter="critical" onclick="setFilter(this)">Critical</button>
+      </div>
+      <button class="btn-add-patient" onclick="openAddModal()">
+        <i data-lucide="user-plus" style="width:15px;height:15px;"></i>
+        <span id="add-label">Register Patient</span>
+      </button>
+    </div>
+
+    <!-- BODY -->
+    <div id="body">
+
+      <!-- LIST PANEL -->
+      <div id="list-panel">
+
+        <!-- Stats -->
+        <div id="stats-row">
+          <div class="stat-chip"><div class="stat-val" id="st-total">0</div><div class="stat-lbl">Total patients</div></div>
+          <div class="stat-chip"><div class="stat-val"><span id="st-active">0</span></div><div class="stat-lbl">Active</div></div>
+          <div class="stat-chip"><div class="stat-val" id="st-new">0</div><div class="stat-lbl">New this month</div></div>
+          <div class="stat-chip"><div class="stat-val" id="st-critical">0</div><div class="stat-lbl">Critical</div></div>
+        </div>
+
+        <!-- Table header -->
+        <div class="table-header grid-cols" id="table-header">
+          <div></div>
+          <div class="th" onclick="sortBy('name')">Patient <i data-lucide="chevrons-up-down" style="width:12px;height:12px;opacity:0.5;"></i></div>
+          <div class="th col-doctor" onclick="sortBy('doctor')">Doctor</div>
+          <div class="th col-blood">Blood</div>
+          <div class="th col-last"  onclick="sortBy('lastVisit')">Last Visit</div>
+          <div class="th col-status">Status</div>
+        </div>
+
+        <!-- Patient list -->
+        <div id="patient-list"></div>
+
+      </div>
+
+      <!-- DETAIL PANEL -->
+      <div id="detail-panel" class="hidden">
+        <div id="detail-inner"></div>
+      </div>
+
+    </div>
+  </div><!-- /main -->
+</div>
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav">
+  <a href="#"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i><span>Home</span></a>
+  <a href="#"><i data-lucide="calendar-days" style="width:20px;height:20px;"></i><span>Appts</span></a>
+  <a href="#" class="active"><i data-lucide="users" style="width:20px;height:20px;"></i><span>Patients</span></a>
+  <a href="#"><i data-lucide="receipt" style="width:20px;height:20px;"></i><span>Billing</span></a>
+  <a href="#"><i data-lucide="settings" style="width:20px;height:20px;"></i><span>Settings</span></a>
+</nav>
+
+<!-- ADD PATIENT MODAL -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div id="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Register Patient</h2>
+      <button class="modal-close" onclick="closeModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+/* ══════════ DATA ══════════ */
+const FIRST = ['Chioma','Femi','Ngozi','Emeka','Kemi','Blessing','Tunde','Grace','Ibrahim','Amara','Sade','Yemi','Rita','Chris','Damilola','Funke','Biodun','Tobi','Chidi','Zainab','Aisha','Kofi','Nkechi','Taiwo','Adeola','Olumide','Fatima','Praise','Victor','Beatrice'];
+const LAST  = ['Eze','Adeyemi','Nnadi','Chukwu','Adeoye','Obi','Fashola','Nwachukwu','Musa','Okonkwo','Williams','Okonkwo','Nwosu','Eze','Lawal','Adebayo','Adesanya','Adeleke','Okafor','Bello','Abubakar','Mensah','Obi','Babatunde','Afolabi','Adesanya','Nwosu','Eze','Nwachukwu','Ogbu'];
+const DOCTORS   = ['Dr. Bello','Dr. Okafor','Dr. Adaeze','Dr. Yusuf','Dr. Amaka'];
+const BLOOD     = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+const CONDITIONS= ['Hypertension','Diabetes Type 2','Asthma','Malaria','Sickle Cell','Arthritis','Gastritis','None','None','None'];
+const ALLERGIES = ['Penicillin','Aspirin','None','None','None','Sulfa drugs','None','Latex','None','None'];
+const AV_COLORS = ['#4A7C59','#E8927C','#C9A84C','#8A9BB0','#6BA37A','#2F5C3A','#c97058','#8B6A1A'];
+
+let patients = [];
+let filtered = [];
+let sortKey = 'name';
+let sortDir = 1;
+let activeFilter = 'all';
+let selectedId = null;
+
+function rnd(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function rndInt(a,b) { return a + Math.floor(Math.random() * (b-a+1)); }
+function pastDate(daysAgo) { const d = new Date(); d.setDate(d.getDate() - daysAgo); return d; }
+function fmtDate(d) { const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return `${m[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
+function initials(n) { return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+
+function generatePatients() {
+  const list = [];
+  for (let i = 0; i < 48; i++) {
+    const fn = rnd(FIRST), ln = rnd(LAST);
+    const age = rndInt(5, 82);
+    const gender = Math.random() > 0.5 ? 'Male' : 'Female';
+    const daysAgo = rndInt(0, 180);
+    const isNew = daysAgo < 30;
+    const cond  = rnd(CONDITIONS);
+    const statuses = isNew ? 'new' : (Math.random() < 0.08 ? 'critical' : 'active');
+    const visits = rndInt(1, 24);
+    const bp = `${rndInt(110,160)}/${rndInt(70,100)}`;
+    const weight = rndInt(45,110);
+    const temp   = (36.5 + Math.random()).toFixed(1);
+    const hr     = rndInt(60, 100);
+    const bmi    = (weight / ((1.5 + Math.random() * 0.4) ** 2)).toFixed(1);
+    list.push({
+      id: 1000 + i,
+      name: `${fn} ${ln}`,
+      age, gender,
+      blood: rnd(BLOOD),
+      phone: `080${rndInt(10000000,99999999)}`,
+      email: `${fn.toLowerCase()}.${ln.toLowerCase()}@email.com`,
+      doctor: rnd(DOCTORS),
+      condition: cond,
+      allergy: rnd(ALLERGIES),
+      status: statuses,
+      lastVisit: pastDate(daysAgo),
+      registered: pastDate(rndInt(daysAgo, 365)),
+      totalVisits: visits,
+      color: AV_COLORS[i % AV_COLORS.length],
+      vitals: { bp, weight, temp, hr, bmi, spo2: rndInt(96,100) },
+      bpHigh: parseInt(bp) > 140,
+      prescriptions: Math.random() < 0.6 ? [
+        { name: rnd(['Amlodipine 5mg','Metformin 500mg','Lisinopril 10mg','Atorvastatin 20mg','Amoxicillin 500mg']), dose: rnd(['Once daily','Twice daily','Thrice daily']), days: rndInt(7,60), used: rndInt(1,50), status: 'active' },
+        ...(Math.random() < 0.4 ? [{ name: rnd(['Paracetamol 500mg','Ibuprofen 400mg','Omeprazole 20mg']), dose: 'As needed', days: 30, used: 30, status: 'completed' }] : [])
+      ] : [],
+      labs: Math.random() < 0.7 ? [
+        { name: rnd(['Full Blood Count','Urinalysis','Lipid Panel','Blood Glucose','Malaria RDT','LFT']), date: pastDate(rndInt(1,60)), result: rnd(['normal','elevated','pending']), doctor: rnd(DOCTORS) },
+        ...(Math.random() < 0.5 ? [{ name: rnd(['Chest X-Ray','ECG','HbA1c','Urea/Creatinine']), date: pastDate(rndInt(30,120)), result: rnd(['normal','elevated']), doctor: rnd(DOCTORS) }] : [])
+      ] : [],
+      visits_hist: Array.from({length: Math.min(visits,4)}, (_,i) => ({
+        type: rnd(['Consultation','Follow-up','Lab Review','Procedure','Emergency']),
+        doctor: rnd(DOCTORS),
+        date: pastDate(rndInt(i*30, i*30+30)),
+        note: rnd(['Presented with headache. BP elevated. Medication adjusted.','Routine follow-up. Patient doing well.','Lab results reviewed. Continue medication.','Complaint of chest pain. ECG done. Normal.','Fever managed. Malaria RDT negative.'])
+      }))
+    });
+  }
+  return list;
+}
+
+patients = generatePatients();
+
+/* ══ FILTERING & SORTING ══ */
+function applyFilters() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  filtered = patients.filter(p => {
+    const matchFilter = activeFilter === 'all' || p.status === activeFilter;
+    const matchQ = !q || p.name.toLowerCase().includes(q) || String(p.id).includes(q) || p.phone.includes(q) || p.condition.toLowerCase().includes(q);
+    return matchFilter && matchQ;
+  });
+  filtered.sort((a,b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (sortKey === 'lastVisit') { va = va.getTime(); vb = vb.getTime(); }
+    else if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
+  });
+  updateStats();
+  renderList();
+}
+
+function setFilter(btn) {
+  document.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeFilter = btn.dataset.filter;
+  applyFilters();
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  document.querySelectorAll('.th').forEach(t => t.classList.remove('sorted'));
+  applyFilters();
+}
+
+function updateStats() {
+  document.getElementById('st-total').textContent    = patients.length;
+  document.getElementById('st-active').textContent   = patients.filter(p=>p.status==='active').length;
+  document.getElementById('st-new').textContent      = patients.filter(p=>p.status==='new').length;
+  document.getElementById('st-critical').textContent = patients.filter(p=>p.status==='critical').length;
+}
+
+/* ══ RENDER LIST ══ */
+function renderList() {
+  const el = document.getElementById('patient-list');
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><i data-lucide="search-x" style="width:40px;height:40px;opacity:0.3;"></i><p>No patients found matching your search.</p></div>`;
+    lucide.createIcons(); return;
+  }
+  el.innerHTML = filtered.map((p, i) => {
+    const statusCls = { active:'b-active', new:'b-new', inactive:'b-inactive', critical:'b-critical' }[p.status] || 'b-active';
+    const selected = p.id === selectedId ? ' selected' : '';
+    return `<div class="patient-row grid-cols${selected}" onclick="selectPatient(${p.id})" style="animation-delay:${i*0.02}s">
+      <div class="p-avatar" style="background:${p.color};">${initials(p.name)}</div>
+      <div>
+        <div class="p-name">${p.name}</div>
+        <div class="p-id">P-${p.id} · ${p.age}y ${p.gender[0]} · ${p.condition}</div>
+      </div>
+      <div class="p-meta col-doctor">${p.doctor}</div>
+      <div class="p-meta col-blood" style="font-weight:700;">${p.blood}</div>
+      <div class="p-last col-last">${fmtDate(p.lastVisit)}</div>
+      <div class="p-status-col col-status"><span class="badge ${statusCls}">${p.status}</span></div>
+    </div>`;
+  }).join('');
+  lucide.createIcons();
+}
+
+/* ══ PATIENT DETAIL ══ */
+function selectPatient(id) {
+  selectedId = id;
+  const p = patients.find(x => x.id === id);
+  document.querySelectorAll('.patient-row').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.patient-row').forEach(r => { if (r.onclick.toString().includes(id)) r.classList.add('selected'); });
+
+  const panel = document.getElementById('detail-panel');
+  panel.classList.remove('hidden');
+  panel.classList.add('visible');
+
+  renderDetail(p);
+  if (window.innerWidth < 1100) {
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById('overlay').onclick = closeDetail;
+  }
+}
+
+function closeDetail() {
+  selectedId = null;
+  document.getElementById('detail-panel').classList.remove('visible');
+  document.getElementById('detail-panel').classList.add('hidden');
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('overlay').onclick = closeSidebar;
+  document.querySelectorAll('.patient-row').forEach(r => r.classList.remove('selected'));
+}
+
+function renderDetail(p) {
+  const statusCls = { active:'b-active', new:'b-new', inactive:'b-inactive', critical:'b-critical' }[p.status] || 'b-active';
+
+  const overviewHTML = `
+    <div class="detail-section">
+      <!-- Profile hero -->
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+        <div style="width:56px;height:56px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0;border:3px solid rgba(255,255,255,0.3);">${initials(p.name)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--ink);">${p.name}</div>
+          <div style="font-size:12px;color:var(--slate);margin-top:2px;">P-${p.id} · <span class="badge ${statusCls}">${p.status}</span></div>
+        </div>
+        <button onclick="closeDetail()" class="detail-close"><i data-lucide="x" style="width:15px;height:15px;"></i></button>
+      </div>
+      <!-- Info chips -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="padding:10px 12px;background:var(--paper);border-radius:10px;border:1px solid var(--border);">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin-bottom:3px;">Age / Gender</div>
+          <div style="font-size:13px;font-weight:600;">${p.age} years · ${p.gender}</div>
+        </div>
+        <div style="padding:10px 12px;background:var(--paper);border-radius:10px;border:1px solid var(--border);">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin-bottom:3px;">Blood Group</div>
+          <div style="font-size:13px;font-weight:700;color:var(--blush);">${p.blood}</div>
+        </div>
+        <div style="padding:10px 12px;background:var(--paper);border-radius:10px;border:1px solid var(--border);">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin-bottom:3px;">Doctor</div>
+          <div style="font-size:13px;font-weight:600;">${p.doctor}</div>
+        </div>
+        <div style="padding:10px 12px;background:var(--paper);border-radius:10px;border:1px solid var(--border);">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin-bottom:3px;">Total Visits</div>
+          <div style="font-size:13px;font-weight:600;">${p.totalVisits} visits</div>
+        </div>
+      </div>
+      <!-- Allergy / condition -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+        ${p.condition !== 'None' ? `<span style="font-size:11px;background:var(--gold-pale);color:#8B6A1A;padding:4px 10px;border-radius:100px;font-weight:600;">${p.condition}</span>` : ''}
+        ${p.allergy !== 'None' ? `<span style="font-size:11px;background:var(--blush-pale);color:#c05c3c;padding:4px 10px;border-radius:100px;font-weight:600;">⚠ Allergy: ${p.allergy}</span>` : '<span style="font-size:11px;background:var(--sage-pale);color:var(--sage-dark);padding:4px 10px;border-radius:100px;font-weight:600;">No known allergies</span>'}
+      </div>
+      <!-- Contact -->
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--slate);">
+          <i data-lucide="phone" style="width:14px;height:14px;flex-shrink:0;"></i>${p.phone}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--slate);">
+          <i data-lucide="mail" style="width:14px;height:14px;flex-shrink:0;"></i>${p.email}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--slate);">
+          <i data-lucide="calendar" style="width:14px;height:14px;flex-shrink:0;"></i>Last visit: ${fmtDate(p.lastVisit)}
+        </div>
+      </div>
+    </div>
+    <!-- Quick actions -->
+    <div class="detail-section">
+      <div class="ds-title">Quick Actions</div>
+      <div class="action-grid">
+        <button class="action-btn" onclick="bookAppt('${p.name}')">
+          <i data-lucide="calendar-plus" style="width:18px;height:18px;color:var(--sage);"></i>Book Appt
+        </button>
+        <button class="action-btn">
+          <i data-lucide="message-circle" style="width:18px;height:18px;color:var(--blush);"></i>Message
+        </button>
+        <button class="action-btn">
+          <i data-lucide="receipt" style="width:18px;height:18px;color:var(--gold);"></i>New Invoice
+        </button>
+        <button class="action-btn" onclick="openEditModal(${p.id})">
+          <i data-lucide="pencil" style="width:18px;height:18px;color:var(--slate);"></i>Edit Record
+        </button>
+      </div>
+    </div>
+    <!-- Vitals -->
+    <div class="detail-section">
+      <div class="ds-title">Latest Vitals <span style="font-size:9px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--slate);">· ${fmtDate(p.lastVisit)}</span></div>
+      <div class="vitals-grid">
+        <div class="vital-card${p.bpHigh ? ' alert' : ''}">
+          <div class="vc-label">Blood Pressure</div>
+          <div class="vc-val">${p.vitals.bp}</div>
+          <div class="vc-sub">${p.bpHigh ? '↑ Elevated' : 'Normal range'}</div>
+        </div>
+        <div class="vital-card">
+          <div class="vc-label">Heart Rate</div>
+          <div class="vc-val">${p.vitals.hr}<span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:400;color:var(--slate);"> bpm</span></div>
+          <div class="vc-sub">Normal</div>
+        </div>
+        <div class="vital-card">
+          <div class="vc-label">Temperature</div>
+          <div class="vc-val">${p.vitals.temp}<span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:400;color:var(--slate);">°C</span></div>
+          <div class="vc-sub">Normal</div>
+        </div>
+        <div class="vital-card">
+          <div class="vc-label">Weight / BMI</div>
+          <div class="vc-val">${p.vitals.weight}<span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:400;color:var(--slate);"> kg</span></div>
+          <div class="vc-sub">BMI ${p.vitals.bmi}</div>
+        </div>
+        <div class="vital-card">
+          <div class="vc-label">SpO₂</div>
+          <div class="vc-val">${p.vitals.spo2}<span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:400;color:var(--slate);">%</span></div>
+          <div class="vc-sub">Oxygen normal</div>
+        </div>
+      </div>
+    </div>`;
+
+  const historyHTML = `
+    <div class="detail-section">
+      <div class="ds-title">Visit History</div>
+      ${p.visits_hist.length ? p.visits_hist.map((v, i) => `
+        <div class="visit-row">
+          <div class="vr-left">
+            <div class="vr-dot" style="background:${i===0?'var(--sage-pale)':'var(--slate-pale)'};"><i data-lucide="stethoscope" style="width:13px;height:13px;color:${i===0?'var(--sage)':'var(--slate)'};"></i></div>
+            ${i < p.visits_hist.length-1 ? '<div class="vr-line"></div>' : ''}
+          </div>
+          <div class="vr-body">
+            <div class="vr-title">${v.type}</div>
+            <div class="vr-meta">${v.doctor}</div>
+            <div class="vr-meta" style="font-style:italic;opacity:0.8;">"${v.note}"</div>
+            <div class="vr-date">${fmtDate(v.date)}</div>
+          </div>
+        </div>`).join('') : '<p style="font-size:13px;color:var(--slate);">No visits recorded yet.</p>'}
+    </div>`;
+
+  const rxHTML = `
+    <div class="detail-section">
+      <div class="ds-title">Prescriptions</div>
+      ${p.prescriptions.length ? p.prescriptions.map(rx => `
+        <div class="rx-row">
+          <div class="rx-icon" style="background:${rx.status==='active'?'var(--sage-pale)':'var(--slate-pale)'};">
+            <i data-lucide="pill" style="width:16px;height:16px;color:${rx.status==='active'?'var(--sage)':'var(--slate)'};"></i>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div class="rx-name">${rx.name}</div>
+            <div class="rx-meta">${rx.dose}</div>
+            ${rx.status==='active' ? `
+              <div class="prog" style="margin-top:7px;width:100%;"><div class="prog-fill" style="width:${Math.round(rx.used/rx.days*100)}%;background:${rx.used/rx.days>0.8?'var(--blush)':'var(--sage)'};"></div></div>
+              <div style="font-size:10px;color:var(--slate);margin-top:3px;">${rx.days-rx.used} of ${rx.days} days remaining</div>` : ''}
+          </div>
+          <div class="rx-status"><span class="badge ${rx.status==='active'?'b-active':'b-inactive'}">${rx.status}</span></div>
+        </div>`).join('') : '<p style="font-size:13px;color:var(--slate);">No active prescriptions.</p>'}
+    </div>
+    <div class="detail-section">
+      <div class="ds-title">Lab Results</div>
+      ${p.labs.length ? p.labs.map(lab => {
+        const rc = { normal:'sage', elevated:'blush', pending:'gold' }[lab.result] || 'slate';
+        return `<div class="lab-row">
+          <div class="lab-icon" style="background:var(--${rc}-pale,#EEF2F7);">
+            <i data-lucide="flask-conical" style="width:15px;height:15px;color:var(--${rc},var(--slate));"></i>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div class="lab-name">${lab.name}</div>
+            <div class="lab-meta">${lab.doctor} · ${fmtDate(lab.date)}</div>
+          </div>
+          <div class="lab-status"><span class="badge b-${lab.result==='normal'?'active':lab.result==='pending'?'new':'critical'}">${lab.result}</span></div>
+        </div>`;}).join('') : '<p style="font-size:13px;color:var(--slate);">No lab results on file.</p>'}
+    </div>`;
+
+  document.getElementById('detail-inner').innerHTML = `
+    <div style="display:flex;flex-direction:column;height:100%;">
+      <!-- Tab nav -->
+      <div class="detail-tabs">
+        <button class="detail-tab active" onclick="switchTab(this,'tab-overview')">Overview</button>
+        <button class="detail-tab"        onclick="switchTab(this,'tab-history')">History</button>
+        <button class="detail-tab"        onclick="switchTab(this,'tab-rx')">Rx & Labs</button>
+      </div>
+      <!-- Tab contents -->
+      <div class="detail-scroll">
+        <div id="tab-overview" class="detail-tab-content active">${overviewHTML}</div>
+        <div id="tab-history"  class="detail-tab-content">${historyHTML}</div>
+        <div id="tab-rx"       class="detail-tab-content">${rxHTML}</div>
+      </div>
+    </div>`;
+
+  lucide.createIcons();
+}
+
+function switchTab(btn, tabId) {
+  btn.closest('.detail-tabs').querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+
+/* ══ ADD PATIENT MODAL ══ */
+function openAddModal(editId = null) {
+  const p = editId ? patients.find(x => x.id === editId) : null;
+  document.getElementById('modal-title').textContent = p ? 'Edit Patient' : 'Register Patient';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="m-row">
+      <div class="m-field"><label>First Name</label><input type="text" id="m-fn" placeholder="Adaeze" value="${p ? p.name.split(' ')[0] : ''}"/></div>
+      <div class="m-field"><label>Last Name</label><input type="text" id="m-ln" placeholder="Obi" value="${p ? p.name.split(' ').slice(1).join(' ') : ''}"/></div>
+    </div>
+    <div class="m-row">
+      <div class="m-field"><label>Age</label><input type="number" id="m-age" placeholder="32" min="0" max="120" value="${p ? p.age : ''}"/></div>
+      <div class="m-field"><label>Gender</label>
+        <select id="m-gender">
+          <option ${p&&p.gender==='Male'?'selected':''}>Male</option>
+          <option ${p&&p.gender==='Female'?'selected':''}>Female</option>
+          <option ${p&&p.gender==='Other'?'selected':''}>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="m-row">
+      <div class="m-field"><label>Phone</label><input type="tel" id="m-phone" placeholder="08012345678" value="${p ? p.phone : ''}"/></div>
+      <div class="m-field"><label>Blood Group</label>
+        <select id="m-blood">
+          ${BLOOD.map(b => `<option ${p&&p.blood===b?'selected':''}>${b}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="m-field"><label>Email</label><input type="email" id="m-email" placeholder="patient@email.com" value="${p ? p.email : ''}"/></div>
+    <div class="m-row">
+      <div class="m-field"><label>Assign Doctor</label>
+        <select id="m-doctor">
+          ${DOCTORS.map(d => `<option ${p&&p.doctor===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="m-field"><label>Condition</label><input type="text" id="m-cond" placeholder="e.g. Hypertension" value="${p && p.condition !== 'None' ? p.condition : ''}"/></div>
+    </div>
+    <div class="m-field"><label>Known Allergies</label><input type="text" id="m-allergy" placeholder="e.g. Penicillin, or None" value="${p ? p.allergy : ''}"/></div>
+    <div class="m-actions">
+      <button class="btn-cancel-m" onclick="closeModal()">Cancel</button>
+      <button class="btn-save-m" onclick="savePatient(${editId||'null'})">${p ? 'Save changes' : 'Register patient'}</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function openEditModal(id) { closeDetail(); openAddModal(id); }
+
+function bookAppt(name) {
+  alert(`Booking appointment for ${name}.\n(In production, this would open the appointment booking modal.)`);
+}
+
+function savePatient(editId) {
+  const fn = document.getElementById('m-fn').value.trim();
+  const ln = document.getElementById('m-ln').value.trim();
+  const age = parseInt(document.getElementById('m-age').value) || 0;
+  const gender = document.getElementById('m-gender').value;
+  const phone  = document.getElementById('m-phone').value.trim();
+  const blood  = document.getElementById('m-blood').value;
+  const email  = document.getElementById('m-email').value.trim();
+  const doctor = document.getElementById('m-doctor').value;
+  const cond   = document.getElementById('m-cond').value.trim() || 'None';
+  const allergy= document.getElementById('m-allergy').value.trim() || 'None';
+
+  if (!fn || !ln || !phone) { alert('Please fill in first name, last name, and phone.'); return; }
+
+  if (editId) {
+    const p = patients.find(x => x.id === editId);
+    if (p) Object.assign(p, { name:`${fn} ${ln}`, age, gender, phone, blood, email, doctor, condition:cond, allergy });
+  } else {
+    patients.push({
+      id: Date.now() % 10000,
+      name:`${fn} ${ln}`, age, gender, phone, blood, email, doctor,
+      condition:cond, allergy, status:'new',
+      lastVisit: new Date(), registered: new Date(),
+      totalVisits:0, color: rnd(AV_COLORS),
+      vitals:{ bp:'—',weight:'—',temp:'—',hr:'—',bmi:'—',spo2:'—' },
+      bpHigh:false, prescriptions:[], labs:[], visits_hist:[]
+    });
+  }
+  closeModal();
+  applyFilters();
+  if (editId && selectedId === editId) {
+    renderDetail(patients.find(x=>x.id===editId));
+  }
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+/* ══ SIDEBAR ══ */
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('overlay').onclick = closeSidebar;
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+/* ══ RESPONSIVE ══ */
+function applyResponsive() {
+  const w = window.innerWidth;
+  document.getElementById('add-label').textContent = w < 640 ? 'Register' : 'Register Patient';
+  const chips = document.getElementById('filter-chips');
+  if (chips) chips.style.display = w < 500 ? 'none' : 'flex';
+}
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth >= 1024) { closeSidebar(); }
+  if (window.innerWidth >= 1100 && selectedId) {
+    document.getElementById('overlay').classList.remove('show');
+  }
+  applyResponsive();
+});
+
+/* ══ INIT ══ */
+applyFilters();
+applyResponsive();
+</script>
+</body>
+</html>

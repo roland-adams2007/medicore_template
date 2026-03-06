@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore – Appointments</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink:        #0D1117;
+      --paper:      #F7F4EF;
+      --sage:       #4A7C59;
+      --sage-light: #6BA37A;
+      --sage-dark:  #2F5C3A;
+      --sage-pale:  #E8F2EB;
+      --blush:      #E8927C;
+      --blush-pale: #FAF0ED;
+      --gold:       #C9A84C;
+      --gold-pale:  #FBF6E9;
+      --slate:      #8A9BB0;
+      --border:     rgba(13,17,23,0.09);
+      --sidebar-w:  260px;
+    }
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); overflow: hidden; }
+
+    /* ══ APP SHELL ══ */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ══ SIDEBAR ══ */
+    #sidebar {
+      width: var(--sidebar-w); background: var(--ink);
+      display: flex; flex-direction: column; flex-shrink: 0;
+      height: 100vh; overflow-y: auto;
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); z-index: 50;
+    }
+    @media (max-width: 1023px) {
+      #sidebar { position: fixed; top: 0; left: 0; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0,0,0,0.3); }
+    }
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(13,17,23,0.45); backdrop-filter: blur(2px); z-index: 40; }
+    #overlay.show { display: block; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 12px;
+      color: #8A9BB0; text-decoration: none; font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: rgba(74,124,89,0.15); color: #fff; }
+    .nav-item.active { background: rgba(74,124,89,0.22); color: #fff; border-left-color: var(--sage); }
+
+    /* ══ MAIN ══ */
+    #main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ══ TOPBAR ══ */
+    #topbar {
+      background: rgba(247,244,239,0.95); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px; display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0; position: sticky; top: 0; z-index: 30;
+    }
+    #ham-btn { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; flex-shrink: 0; }
+    @media (min-width: 1024px) { #ham-btn { display: none; } }
+
+    .view-tabs { display: flex; gap: 2px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+    .view-tab { padding: 6px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--slate); cursor: pointer; border: none; background: none; font-family: 'DM Sans', sans-serif; transition: all 0.15s; white-space: nowrap; }
+    .view-tab.active { background: var(--sage); color: #fff; font-weight: 600; }
+    .view-tab:hover:not(.active) { background: var(--sage-pale); color: var(--sage-dark); }
+
+    .nav-btns { display: flex; gap: 4px; }
+    .nav-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--slate); transition: all 0.15s; }
+    .nav-btn:hover { border-color: var(--sage); color: var(--sage); }
+
+    #period-label { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--ink); white-space: nowrap; }
+
+    .btn-today { padding: 7px 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn-today:hover { border-color: var(--sage); color: var(--sage); }
+
+    .btn-book { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--sage); color: #fff; font-size: 13px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; white-space: nowrap; margin-left: auto; }
+    .btn-book:hover { background: var(--sage-dark); box-shadow: 0 4px 14px rgba(47,92,58,0.3); }
+
+    /* ══ CONTENT AREA ══ */
+    #content { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+
+    /* ══ MONTH VIEW ══ */
+    #month-view { flex: 1; display: flex; flex-direction: column; padding: 16px; }
+    .month-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-bottom: 2px; }
+    .month-day-name { text-align: center; font-size: 11px; font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 0; }
+    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(90px, 1fr); gap: 2px; flex: 1; }
+
+    .month-cell {
+      background: #fff; border: 1px solid rgba(13,17,23,0.07); border-radius: 10px;
+      padding: 8px; cursor: pointer; min-height: 90px;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex; flex-direction: column; gap: 3px; overflow: hidden;
+    }
+    .month-cell:hover { border-color: var(--sage); background: #fafaf8; }
+    .month-cell.today { border-color: var(--sage); border-width: 2px; background: var(--sage-pale); }
+    .month-cell.other-month { background: rgba(247,244,239,0.5); }
+    .month-cell.other-month .day-num { color: rgba(13,17,23,0.25); }
+    .month-cell.selected { border-color: var(--sage); border-width: 2px; }
+
+    .day-num {
+      font-family: 'DM Serif Display', serif; font-size: 15px; color: var(--ink);
+      width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .month-cell.today .day-num { background: var(--sage); color: #fff; font-size: 13px; }
+
+    .appt-chip {
+      font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .appt-chip:hover { opacity: 0.8; }
+    .chip-sage   { background: var(--sage-pale);  color: var(--sage-dark); }
+    .chip-blush  { background: var(--blush-pale); color: #c05c3c; }
+    .chip-gold   { background: var(--gold-pale);  color: #8b6a1a; }
+    .chip-slate  { background: var(--slate-light, #EEF2F7); color: #4A6580; }
+    .chip-more   { font-size: 10px; color: var(--slate); padding: 1px 0; }
+
+    /* ══ WEEK VIEW ══ */
+    #week-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .week-header-row {
+      display: grid; padding: 0 16px;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+      background: #fff;
+    }
+    .week-day-col { padding: 12px 8px; text-align: center; border-left: 1px solid var(--border); }
+    .week-day-col:first-child { border-left: none; }
+    .wdc-name { font-size: 11px; font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: 0.06em; }
+    .wdc-num  { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--ink); line-height: 1; margin-top: 2px; display: inline-block; }
+    .wdc-num.today-num { background: var(--sage); color: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; margin: 2px auto 0; }
+
+    .week-body { flex: 1; overflow-y: auto; display: grid; padding: 0 16px 16px; }
+    .week-body-inner { display: grid; position: relative; }
+    .time-col { width: 56px; flex-shrink: 0; }
+    .time-slot { height: 56px; display: flex; align-items: flex-start; padding-top: 0; }
+    .time-label { font-size: 10px; font-weight: 600; color: var(--slate); white-space: nowrap; transform: translateY(-7px); }
+    .week-grid-col { flex: 1; border-left: 1px solid var(--border); position: relative; min-width: 0; }
+    .week-grid-col:first-of-type { border-left: none; }
+    .hour-line { height: 56px; border-bottom: 1px solid rgba(13,17,23,0.05); }
+    .week-appt {
+      position: absolute; left: 3px; right: 3px;
+      border-radius: 8px; padding: 6px 8px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      overflow: hidden; transition: opacity 0.15s, transform 0.1s;
+      z-index: 2; border-left: 3px solid;
+    }
+    .week-appt:hover { opacity: 0.88; transform: scale(1.01); }
+    .wa-sage  { background: var(--sage-pale);  border-color: var(--sage);  color: var(--sage-dark); }
+    .wa-blush { background: var(--blush-pale); border-color: var(--blush); color: #c05c3c; }
+    .wa-gold  { background: var(--gold-pale);  border-color: var(--gold);  color: #8b6a1a; }
+    .wa-slate { background: #EEF2F7; border-color: var(--slate); color: #4A6580; }
+    .wa-time  { font-size: 10px; font-weight: 500; opacity: 0.7; margin-top: 2px; }
+    .now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--blush); z-index: 3; }
+    .now-dot  { position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; background: var(--blush); border-radius: 50%; }
+
+    /* ══ DAY VIEW ══ */
+    #day-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .day-view-header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0; }
+    .day-view-title  { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--ink); }
+    .day-view-sub    { font-size: 13px; color: var(--slate); margin-top: 3px; }
+    .day-body { flex: 1; overflow-y: auto; padding: 0 20px 20px; display: flex; gap: 16px; }
+    .day-time-col { width: 60px; flex-shrink: 0; }
+    .day-time-slot { height: 64px; display: flex; align-items: flex-start; }
+    .day-time-label { font-size: 11px; font-weight: 600; color: var(--slate); transform: translateY(-8px); white-space: nowrap; }
+    .day-events-col { flex: 1; position: relative; min-width: 0; }
+    .day-hour-line { height: 64px; border-bottom: 1px solid rgba(13,17,23,0.06); }
+    .day-appt {
+      position: absolute; left: 0; right: 0;
+      border-radius: 10px; padding: 10px 14px;
+      cursor: pointer; overflow: hidden;
+      transition: transform 0.1s, box-shadow 0.15s;
+      border-left: 4px solid; z-index: 2;
+    }
+    .day-appt:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .da-sage  { background: var(--sage-pale);  border-color: var(--sage); }
+    .da-blush { background: var(--blush-pale); border-color: var(--blush); }
+    .da-gold  { background: var(--gold-pale);  border-color: var(--gold); }
+    .da-slate { background: #EEF2F7; border-color: var(--slate); }
+    .da-name  { font-size: 13px; font-weight: 600; color: var(--ink); }
+    .da-meta  { font-size: 11px; color: var(--slate); margin-top: 3px; }
+    .da-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 100px; margin-top: 6px; }
+
+    /* ══ LIST VIEW ══ */
+    #list-view { flex: 1; overflow-y: auto; padding: 16px; }
+    .list-date-group { margin-bottom: 20px; }
+    .list-date-label { font-family: 'DM Serif Display', serif; font-size: 15px; color: var(--ink); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .list-date-today { font-size: 11px; background: var(--sage); color: #fff; padding: 2px 8px; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-weight: 700; }
+    .list-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 14px; background: #fff; border-radius: 12px;
+      border: 1px solid var(--border); margin-bottom: 8px; cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .list-row:hover { border-color: var(--sage); transform: translateX(3px); }
+    .list-time-badge { width: 58px; text-align: center; flex-shrink: 0; }
+    .list-time  { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .list-dur   { font-size: 10px; color: var(--slate); margin-top: 1px; }
+    .list-bar   { width: 3px; height: 40px; border-radius: 100px; flex-shrink: 0; }
+    .list-info  { flex: 1; min-width: 0; }
+    .list-name  { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .list-meta  { font-size: 12px; color: var(--slate); margin-top: 2px; }
+    .list-status { flex-shrink: 0; }
+
+    /* ══ BADGE ══ */
+    .badge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 100px; white-space: nowrap; }
+    .b-confirmed { background: var(--sage-pale); color: var(--sage-dark); }
+    .b-pending   { background: var(--gold-pale); color: #8b6a1a; }
+    .b-cancelled { background: var(--blush-pale); color: #c05c3c; }
+    .b-completed { background: #EEF2F7; color: #4A6580; }
+    .b-checkin   { background: var(--ink); color: #fff; }
+
+    /* ══ MODAL ══ */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(13,17,23,0.5); backdrop-filter: blur(4px);
+      z-index: 200; align-items: center; justify-content: center; padding: 20px;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal {
+      background: #fff; border-radius: 20px; width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 24px 80px rgba(13,17,23,0.25);
+      animation: modalIn 0.25s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+    .modal-header { padding: 24px 24px 0; display: flex; align-items: center; justify-content: space-between; }
+    .modal-title  { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--ink); }
+    .modal-close  { width: 34px; height: 34px; background: var(--paper); border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--slate); transition: all 0.15s; }
+    .modal-close:hover { background: var(--blush-pale); color: var(--blush); }
+    .modal-body   { padding: 20px 24px 24px; }
+
+    .m-field { margin-bottom: 16px; }
+    .m-field label { display: block; font-size: 12px; font-weight: 700; color: var(--ink); letter-spacing: 0.02em; margin-bottom: 6px; text-transform: uppercase; }
+    .m-field input, .m-field select, .m-field textarea {
+      width: 100%; padding: 11px 14px;
+      font-size: 14px; font-family: 'DM Sans', sans-serif;
+      background: var(--paper); border: 1.5px solid var(--border);
+      border-radius: 10px; outline: none; color: var(--ink);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none;
+    }
+    .m-field input:focus, .m-field select:focus, .m-field textarea:focus {
+      border-color: var(--sage); box-shadow: 0 0 0 3px rgba(74,124,89,0.12); background: #fff;
+    }
+    .m-field input::placeholder, .m-field textarea::placeholder { color: #B8C0CC; }
+    .m-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .m-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .m-type-btn { padding: 10px 8px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; font-size: 12px; font-weight: 600; color: var(--slate); cursor: pointer; text-align: center; transition: all 0.15s; }
+    .m-type-btn:hover { border-color: var(--sage); color: var(--sage-dark); }
+    .m-type-btn.selected { background: var(--sage-pale); border-color: var(--sage); color: var(--sage-dark); }
+    .m-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-cancel-m { flex: 1; padding: 12px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--slate); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .btn-cancel-m:hover { border-color: var(--blush); color: var(--blush); }
+    .btn-save-m { flex: 2; padding: 12px; background: var(--sage); border: none; border-radius: 10px; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .btn-save-m:hover { background: var(--sage-dark); box-shadow: 0 4px 14px rgba(47,92,58,0.3); }
+
+    /* Appointment detail modal */
+    .detail-patient { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--paper); border-radius: 12px; margin-bottom: 16px; }
+    .detail-av { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .detail-name { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .detail-id   { font-size: 12px; color: var(--slate); margin-top: 2px; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .detail-item { background: var(--paper); border-radius: 10px; padding: 12px 14px; }
+    .detail-item-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate); margin-bottom: 4px; }
+    .detail-item-val   { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .detail-btn { flex: 1; min-width: 100px; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: #fff; color: var(--ink); font-family: 'DM Sans', sans-serif; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .detail-btn:hover { border-color: var(--sage); background: var(--sage-pale); color: var(--sage-dark); }
+    .detail-btn.danger:hover { border-color: var(--blush); background: var(--blush-pale); color: #c05c3c; }
+    .detail-btn.primary { background: var(--sage); border-color: var(--sage); color: #fff; }
+    .detail-btn.primary:hover { background: var(--sage-dark); }
+
+    /* ══ SCROLLBARS ══ */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C8C4BC; border-radius: 100px; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+    @keyframes pdot   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
+    .pdot { animation: pdot 2s infinite; }
+    #month-view, #week-view, #day-view, #list-view { animation: fadeUp 0.25s ease; }
+
+    /* ══ BOTTOM NAV ══ */
+    #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--ink); border-top: 1px solid rgba(255,255,255,0.08); display: flex; z-index: 45; padding-bottom: env(safe-area-inset-bottom,0); }
+    @media (min-width: 1024px) { #bottom-nav { display: none; } }
+    #bottom-nav a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 4px 8px; color: #8A9BB0; font-size: 10px; text-decoration: none; transition: color 0.15s; }
+    #bottom-nav a.active, #bottom-nav a:hover { color: var(--sage); }
+
+    @media (max-width: 600px) {
+      .view-tabs .view-tab[data-view="list"] { display: none; }
+      .m-field-row, .m-type-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 400px) { .week-body { font-size: 10px; } }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside id="sidebar">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#4A7C59,#2F5C3A);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="activity" style="width:18px;height:18px;color:#fff;"></i>
+        </div>
+        <div>
+          <p style="font-family:'DM Serif Display',serif;color:#fff;font-size:18px;line-height:1;">MediCore</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:2px;">Clinic Admin</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#8A9BB0;background:rgba(255,255,255,0.06);border:none;border-radius:8px;cursor:pointer;">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:12px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;">GH</div>
+        <div style="flex:1;min-width:0;">
+          <p style="color:#fff;font-size:13px;font-weight:600;">Grace Health Clinic</p>
+          <p style="color:#8A9BB0;font-size:11px;margin-top:1px;">Dr. Adaeze Obi · Admin</p>
+        </div>
+      </div>
+    </div>
+    <nav style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:2px;">
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:6px 12px;">Main</p>
+      <a href="#" class="nav-item"><i data-lucide="layout-dashboard" style="width:16px;height:16px;flex-shrink:0;"></i>Dashboard</a>
+      <a href="#" class="nav-item active"><i data-lucide="calendar-days" style="width:16px;height:16px;flex-shrink:0;"></i>Appointments</a>
+      <a href="#" class="nav-item"><i data-lucide="users" style="width:16px;height:16px;flex-shrink:0;"></i>Patients</a>
+      <a href="#" class="nav-item"><i data-lucide="stethoscope" style="width:16px;height:16px;flex-shrink:0;"></i>Doctors</a>
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:14px 12px 6px;">Clinical</p>
+      <a href="#" class="nav-item"><i data-lucide="file-heart" style="width:16px;height:16px;flex-shrink:0;"></i>Medical Records</a>
+      <a href="#" class="nav-item"><i data-lucide="pill" style="width:16px;height:16px;flex-shrink:0;"></i>Prescriptions</a>
+      <a href="#" class="nav-item"><i data-lucide="flask-conical" style="width:16px;height:16px;flex-shrink:0;"></i>Lab Results</a>
+      <p style="font-size:10px;font-weight:700;color:rgba(138,155,176,0.5);text-transform:uppercase;letter-spacing:0.1em;padding:14px 12px 6px;">Admin</p>
+      <a href="#" class="nav-item"><i data-lucide="receipt" style="width:16px;height:16px;flex-shrink:0;"></i>Billing</a>
+      <a href="#" class="nav-item"><i data-lucide="bar-chart-2" style="width:16px;height:16px;flex-shrink:0;"></i>Reports</a>
+      <a href="#" class="nav-item"><i data-lucide="settings" style="width:16px;height:16px;flex-shrink:0;"></i>Settings</a>
+    </nav>
+    <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#4A7C59,#2F5C3A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">AO</div>
+      <div style="flex:1;min-width:0;"><p style="color:#fff;font-size:13px;font-weight:500;">Dr. Adaeze Obi</p><p style="color:#8A9BB0;font-size:11px;">Clinic Admin</p></div>
+      <button style="background:none;border:none;color:#8A9BB0;cursor:pointer;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#8A9BB0'"><i data-lucide="log-out" style="width:15px;height:15px;"></i></button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <button id="ham-btn" onclick="openSidebar()" style="background:#fff;border:1px solid var(--border);border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+        <i data-lucide="menu" style="width:17px;height:17px;color:var(--ink);"></i>
+      </button>
+
+      <div class="nav-btns">
+        <button class="nav-btn" onclick="navigate(-1)" title="Previous"><i data-lucide="chevron-left" style="width:16px;height:16px;"></i></button>
+        <button class="nav-btn" onclick="navigate(1)"  title="Next"><i data-lucide="chevron-right" style="width:16px;height:16px;"></i></button>
+      </div>
+
+      <span id="period-label">March 2026</span>
+
+      <button class="btn-today" onclick="goToday()">Today</button>
+
+      <div class="view-tabs" style="margin-left:8px;">
+        <button class="view-tab active" data-view="month" onclick="setView('month')">Month</button>
+        <button class="view-tab" data-view="week"  onclick="setView('week')">Week</button>
+        <button class="view-tab" data-view="day"   onclick="setView('day')">Day</button>
+        <button class="view-tab" data-view="list"  onclick="setView('list')">List</button>
+      </div>
+
+      <!-- Filter doctor -->
+      <select id="doctor-filter" onchange="renderView()" style="padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--ink);outline:none;cursor:pointer;display:none;" id="doc-filter">
+        <option value="all">All doctors</option>
+        <option value="Dr. Bello">Dr. Bello</option>
+        <option value="Dr. Okafor">Dr. Okafor</option>
+        <option value="Dr. Adaeze">Dr. Adaeze</option>
+        <option value="Dr. Yusuf">Dr. Yusuf</option>
+      </select>
+
+      <button class="btn-book" onclick="openNewModal()">
+        <i data-lucide="plus" style="width:15px;height:15px;"></i>
+        <span id="book-label">Book Appointment</span>
+      </button>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="content">
+      <div id="month-view"></div>
+      <div id="week-view"  style="display:none;"></div>
+      <div id="day-view"   style="display:none;"></div>
+      <div id="list-view"  style="display:none;"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav">
+  <a href="#"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i><span>Home</span></a>
+  <a href="#" class="active"><i data-lucide="calendar-days" style="width:20px;height:20px;"></i><span>Appts</span></a>
+  <a href="#"><i data-lucide="users" style="width:20px;height:20px;"></i><span>Patients</span></a>
+  <a href="#"><i data-lucide="receipt" style="width:20px;height:20px;"></i><span>Billing</span></a>
+  <a href="#"><i data-lucide="settings" style="width:20px;height:20px;"></i><span>Settings</span></a>
+</nav>
+
+<!-- BOOK MODAL -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div id="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Book Appointment</h2>
+      <button class="modal-close" onclick="closeModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+/* ══ STATE ══ */
+const today = new Date();
+let current = new Date(today);
+let currentView = 'month';
+
+const DOCTORS = ['Dr. Bello','Dr. Okafor','Dr. Adaeze','Dr. Yusuf','Dr. Amaka'];
+const TYPES   = ['Consultation','Follow-up','Walk-in','Lab Review','Procedure'];
+const COLORS  = ['sage','blush','gold','slate'];
+const STATUSES = ['confirmed','pending','completed','cancelled'];
+
+const doctorColors = {
+  'Dr. Bello':  'sage',
+  'Dr. Okafor': 'blush',
+  'Dr. Adaeze': 'gold',
+  'Dr. Yusuf':  'slate',
+  'Dr. Amaka':  'sage',
+};
+
+/* ══ APPOINTMENT DATA ══ */
+let appointments = generateAppts();
+
+function generateAppts() {
+  const appts = [];
+  const names = ['Chioma Eze','Femi Adeyemi','Ngozi Nnadi','Emeka Chukwu','Kemi Adeoye','Blessing Obi','Tunde Fashola','Grace Nwachukwu','Ibrahim Musa','Amara Okonkwo','Sade Williams','Yemi Okonkwo','Rita Nwosu','Chris Eze','Damilola Lawal'];
+  let id = 1000;
+
+  for (let d = -15; d <= 45; d++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() + d);
+    const count = Math.floor(Math.random() * 7);
+    for (let i = 0; i < count; i++) {
+      const hour = 8 + Math.floor(Math.random() * 9);
+      const min  = [0, 15, 30, 45][Math.floor(Math.random() * 4)];
+      const dur  = [15, 20, 30, 45, 60][Math.floor(Math.random() * 5)];
+      const doc  = DOCTORS[Math.floor(Math.random() * DOCTORS.length)];
+      const name = names[Math.floor(Math.random() * names.length)];
+      const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+      const stat = d < 0 ? 'completed' : (d === 0 ? ['confirmed','pending','confirmed','confirmed'][Math.floor(Math.random()*4)] : ['confirmed','pending','confirmed'][Math.floor(Math.random()*3)]);
+      appts.push({ id: id++, name, doctor: doc, type, date: new Date(date), hour, min, duration: dur, status: stat, notes: '', room: ['Room ' + (1+Math.floor(Math.random()*5)),'Consultation A','Lab B','Ward 2'][Math.floor(Math.random()*4)] });
+    }
+  }
+  return appts;
+}
+
+function getApptsByDate(d) {
+  const filter = document.getElementById('doctor-filter')?.value || 'all';
+  return appointments.filter(a => {
+    const same = a.date.getFullYear() === d.getFullYear() && a.date.getMonth() === d.getMonth() && a.date.getDate() === d.getDate();
+    if (!same) return false;
+    return filter === 'all' || a.doctor === filter;
+  });
+}
+
+function timeStr(h, m) {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hh = h > 12 ? h - 12 : h || 12;
+  return `${hh}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function endTimeStr(h, m, dur) {
+  const totalMin = h * 60 + m + dur;
+  return timeStr(Math.floor(totalMin/60), totalMin % 60);
+}
+
+function initials(name) {
+  return name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+}
+
+const AV_COLORS = { sage: '#4A7C59', blush: '#E8927C', gold: '#C9A84C', slate: '#8A9BB0' };
+
+/* ══ NAVIGATION ══ */
+function navigate(dir) {
+  if (currentView === 'month') { current.setMonth(current.getMonth() + dir); }
+  else if (currentView === 'week') { current.setDate(current.getDate() + dir * 7); }
+  else { current.setDate(current.getDate() + dir); }
+  renderView();
+}
+
+function goToday() {
+  current = new Date(today);
+  renderView();
+}
+
+function setView(v) {
+  currentView = v;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  document.querySelectorAll('#content > div').forEach(d => d.style.display = 'none');
+  document.getElementById(v + '-view').style.display = 'flex';
+  document.getElementById(v + '-view').style.flexDirection = 'column';
+  // Show doctor filter on week/day
+  const df = document.getElementById('doctor-filter');
+  if (df) df.style.display = (v === 'week' || v === 'day') ? 'block' : 'none';
+  // Responsive label
+  document.getElementById('book-label').textContent = window.innerWidth < 600 ? 'Book' : 'Book Appointment';
+  renderView();
+}
+
+function renderView() {
+  updatePeriodLabel();
+  if (currentView === 'month') renderMonth();
+  else if (currentView === 'week')  renderWeek();
+  else if (currentView === 'day')   renderDay();
+  else renderList();
+  lucide.createIcons();
+}
+
+function updatePeriodLabel() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  if (currentView === 'month') {
+    document.getElementById('period-label').textContent = `${months[current.getMonth()]} ${current.getFullYear()}`;
+  } else if (currentView === 'week') {
+    const start = weekStart(current);
+    const end   = new Date(start); end.setDate(end.getDate() + 6);
+    document.getElementById('period-label').textContent = `${months[start.getMonth()]} ${start.getDate()} – ${start.getMonth() !== end.getMonth() ? months[end.getMonth()] + ' ' : ''}${end.getDate()}, ${end.getFullYear()}`;
+  } else {
+    document.getElementById('period-label').textContent = `${days[current.getDay()]}, ${months[current.getMonth()]} ${current.getDate()}`;
+  }
+}
+
+/* ══════════ MONTH VIEW ══════════ */
+function renderMonth() {
+  const el = document.getElementById('month-view');
+  const year = current.getFullYear(), month = current.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrev  = new Date(year, month, 0).getDate();
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = `<div class="month-grid-header">${dayNames.map(d=>`<div class="month-day-name">${d}</div>`).join('')}</div><div class="month-grid">`;
+
+  // Prev month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrev - i;
+    const dt = new Date(year, month - 1, d);
+    html += renderMonthCell(dt, true);
+  }
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(year, month, d);
+    html += renderMonthCell(dt, false);
+  }
+  // Next month
+  const total = firstDay + daysInMonth;
+  const nextDays = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= nextDays; d++) {
+    const dt = new Date(year, month + 1, d);
+    html += renderMonthCell(dt, true);
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderMonthCell(dt, otherMonth) {
+  const isToday = dt.toDateString() === today.toDateString();
+  const appts = getApptsByDate(dt);
+  let cls = 'month-cell' + (otherMonth ? ' other-month' : '') + (isToday ? ' today' : '');
+
+  let chips = '';
+  const max = window.innerWidth < 600 ? 1 : 3;
+  appts.slice(0, max).forEach(a => {
+    const c = doctorColors[a.doctor] || 'sage';
+    chips += `<div class="appt-chip chip-${c}" onclick="event.stopPropagation();openDetail(${a.id})" title="${a.name} · ${a.doctor}">${timeStr(a.hour,a.min)} ${a.name.split(' ')[0]}</div>`;
+  });
+  if (appts.length > max) chips += `<div class="chip-more">+${appts.length - max} more</div>`;
+
+  const dateStr = `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+  return `<div class="${cls}" onclick="jumpToDay(${dt.getFullYear()},${dt.getMonth()},${dt.getDate()})">
+    <div class="day-num">${dt.getDate()}</div>
+    ${chips}
+  </div>`;
+}
+
+function jumpToDay(y, m, d) {
+  current = new Date(y, m, d);
+  setView('day');
+}
+
+/* ══════════ WEEK VIEW ══════════ */
+function weekStart(d) {
+  const dt = new Date(d);
+  dt.setDate(dt.getDate() - dt.getDay());
+  return dt;
+}
+
+function renderWeek() {
+  const el = document.getElementById('week-view');
+  const start = weekStart(current);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const gridCols = `56px repeat(7, 1fr)`;
+
+  // Header
+  let headerHtml = `<div class="week-header-row" style="display:grid;grid-template-columns:${gridCols};padding:0 16px;">
+    <div style="border-left:none;"></div>`;
+  days.forEach(d => {
+    const isToday = d.toDateString() === today.toDateString();
+    headerHtml += `<div class="week-day-col">
+      <div class="wdc-name">${dayNames[d.getDay()]}</div>
+      <div class="${isToday ? 'wdc-num today-num' : 'wdc-num'}">${d.getDate()}</div>
+    </div>`;
+  });
+  headerHtml += '</div>';
+
+  // Body
+  let bodyHtml = `<div class="week-body"><div class="week-body-inner" style="display:grid;grid-template-columns:${gridCols};position:relative;">`;
+
+  // Time labels
+  bodyHtml += '<div class="time-col">';
+  for (let h = 0; h <= 18; h++) {
+    const label = h === 0 ? '' : timeStr(h + 6, 0);
+    bodyHtml += `<div class="time-slot"><span class="time-label">${label}</span></div>`;
+  }
+  bodyHtml += '</div>';
+
+  // Day columns
+  days.forEach(d => {
+    const appts = getApptsByDate(d);
+    bodyHtml += `<div class="week-grid-col">`;
+    for (let h = 0; h <= 18; h++) bodyHtml += '<div class="hour-line"></div>';
+    // Now line
+    if (d.toDateString() === today.toDateString()) {
+      const nowMin = (today.getHours() - 7) * 60 + today.getMinutes();
+      if (nowMin > 0) bodyHtml += `<div class="now-line" style="top:${nowMin}px;"><div class="now-dot"></div></div>`;
+    }
+    appts.forEach(a => {
+      const top  = ((a.hour - 7) * 60 + a.min);
+      const h    = a.duration;
+      const c    = doctorColors[a.doctor] || 'sage';
+      bodyHtml += `<div class="week-appt wa-${c}" style="top:${top}px;height:${h-2}px;" onclick="openDetail(${a.id})">
+        ${a.name.split(' ')[0]}<br><div class="wa-time">${timeStr(a.hour,a.min)}</div>
+      </div>`;
+    });
+    bodyHtml += '</div>';
+  });
+
+  bodyHtml += '</div></div>';
+  el.innerHTML = headerHtml + bodyHtml;
+
+  // Scroll to 8am
+  setTimeout(() => { const wb = el.querySelector('.week-body'); if(wb) wb.scrollTop = 60; }, 10);
+}
+
+/* ══════════ DAY VIEW ══════════ */
+function renderDay() {
+  const el = document.getElementById('day-view');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const appts = getApptsByDate(current).sort((a,b) => a.hour*60+a.min - (b.hour*60+b.min));
+  const isToday = current.toDateString() === today.toDateString();
+
+  let html = `<div class="day-view-header">
+    <div class="day-view-title">${dayNames[current.getDay()]}, ${months[current.getMonth()]} ${current.getDate()} ${current.getFullYear()}</div>
+    <div class="day-view-sub">${appts.length} appointment${appts.length !== 1 ? 's' : ''}${isToday ? ' · Today' : ''}</div>
+  </div>
+  <div class="day-body">
+    <div class="day-time-col">`;
+
+  for (let h = 0; h <= 18; h++) {
+    const label = h === 0 ? '' : timeStr(h + 6, 0);
+    html += `<div class="day-time-slot"><span class="day-time-label">${label}</span></div>`;
+  }
+  html += '</div><div class="day-events-col">';
+  for (let h = 0; h <= 18; h++) html += '<div class="day-hour-line"></div>';
+
+  // Now line
+  if (isToday) {
+    const nowMin = (today.getHours() - 7) * 60 + today.getMinutes();
+    if (nowMin > 0) html += `<div class="now-line" style="top:${nowMin * 64/60}px;"><div class="now-dot"></div></div>`;
+  }
+
+  appts.forEach(a => {
+    const top = ((a.hour - 7) * 60 + a.min) * 64 / 60;
+    const h   = Math.max(a.duration * 64 / 60, 48);
+    const c   = doctorColors[a.doctor] || 'sage';
+    const statusBg = { confirmed:'#E8F2EB', pending:'#FBF6E9', completed:'#EEF2F7', cancelled:'#FAF0ED' };
+    const statusColor = { confirmed:'#2F5C3A', pending:'#8B6A1A', completed:'#4A6580', cancelled:'#C05C3C' };
+    html += `<div class="day-appt da-${c}" style="top:${top}px;height:${h-4}px;" onclick="openDetail(${a.id})">
+      <div class="da-name">${a.name}</div>
+      <div class="da-meta">${timeStr(a.hour,a.min)} – ${endTimeStr(a.hour,a.min,a.duration)} · ${a.doctor} · ${a.room}</div>
+      <span class="da-badge" style="background:${statusBg[a.status]};color:${statusColor[a.status]};">${a.status}</span>
+    </div>`;
+  });
+
+  html += '</div></div>';
+  el.innerHTML = html;
+  setTimeout(() => { const db = el.querySelector('.day-body'); if(db) db.scrollTop = 60; }, 10);
+}
+
+/* ══════════ LIST VIEW ══════════ */
+function renderList() {
+  const el = document.getElementById('list-view');
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  // Group by date (next 30 days)
+  const groups = {};
+  for (let d = -1; d <= 30; d++) {
+    const dt = new Date(today); dt.setDate(dt.getDate() + d);
+    const key = dt.toDateString();
+    const appts = getApptsByDate(dt).sort((a,b) => a.hour*60+a.min - (b.hour*60+b.min));
+    if (appts.length > 0) groups[key] = { date: dt, appts };
+  }
+
+  let html = '';
+  Object.values(groups).forEach(({ date, appts }) => {
+    const isToday = date.toDateString() === today.toDateString();
+    html += `<div class="list-date-group">
+      <div class="list-date-label">
+        ${dayNames[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}
+        ${isToday ? '<span class="list-date-today">Today</span>' : ''}
+      </div>`;
+    appts.forEach(a => {
+      const c = doctorColors[a.doctor] || 'sage';
+      const barColor = { sage:'#4A7C59', blush:'#E8927C', gold:'#C9A84C', slate:'#8A9BB0' }[c];
+      const statusCls = `b-${a.status}`;
+      html += `<div class="list-row" onclick="openDetail(${a.id})">
+        <div class="list-time-badge">
+          <div class="list-time">${timeStr(a.hour,a.min)}</div>
+          <div class="list-dur">${a.duration}min</div>
+        </div>
+        <div class="list-bar" style="background:${barColor};"></div>
+        <div class="list-info">
+          <div class="list-name">${a.name}</div>
+          <div class="list-meta">${a.doctor} · ${a.type} · ${a.room}</div>
+        </div>
+        <div class="list-status"><span class="badge ${statusCls}">${a.status}</span></div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  if (!html) html = '<div style="text-align:center;padding:60px 20px;color:var(--slate);">No appointments in the next 30 days</div>';
+  el.innerHTML = html;
+}
+
+/* ══ DETAIL MODAL ══ */
+function openDetail(id) {
+  const a = appointments.find(x => x.id === id);
+  if (!a) return;
+  const c = doctorColors[a.doctor] || 'sage';
+  const avColor = AV_COLORS[c];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const statusCls = `b-${a.status}`;
+  const statusBg = { confirmed:'#E8F2EB', pending:'#FBF6E9', completed:'#EEF2F7', cancelled:'#FAF0ED' };
+  const statusColor = { confirmed:'#2F5C3A', pending:'#8B6A1A', completed:'#4A6580', cancelled:'#C05C3C' };
+
+  document.getElementById('modal-title').textContent = a.type;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="detail-patient">
+      <div class="detail-av" style="background:${avColor};">${initials(a.name)}</div>
+      <div>
+        <div class="detail-name">${a.name}</div>
+        <div class="detail-id">P-${String(a.id).slice(-4)} · <span style="background:${statusBg[a.status]};color:${statusColor[a.status]};padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700;">${a.status}</span></div>
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-item-label">Date</div>
+        <div class="detail-item-val">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][a.date.getDay()]}, ${months[a.date.getMonth()]} ${a.date.getDate()}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Time</div>
+        <div class="detail-item-val">${timeStr(a.hour,a.min)} – ${endTimeStr(a.hour,a.min,a.duration)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Doctor</div>
+        <div class="detail-item-val">${a.doctor}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Room</div>
+        <div class="detail-item-val">${a.room}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Type</div>
+        <div class="detail-item-val">${a.type}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Duration</div>
+        <div class="detail-item-val">${a.duration} min</div>
+      </div>
+    </div>
+    ${a.status === 'confirmed' || a.status === 'pending' ? `
+    <div class="detail-actions">
+      <button class="detail-btn primary" onclick="checkIn(${a.id})">
+        <i data-lucide="log-in" style="width:14px;height:14px;"></i> Check In
+      </button>
+      <button class="detail-btn" onclick="editAppt(${a.id})">
+        <i data-lucide="pencil" style="width:14px;height:14px;"></i> Edit
+      </button>
+      <button class="detail-btn danger" onclick="cancelAppt(${a.id})">
+        <i data-lucide="x-circle" style="width:14px;height:14px;"></i> Cancel
+      </button>
+    </div>` : `
+    <div class="detail-actions">
+      <button class="detail-btn" onclick="reschedule(${a.id})">
+        <i data-lucide="calendar" style="width:14px;height:14px;"></i> Reschedule
+      </button>
+      <button class="detail-btn" onclick="closeModal()">
+        <i data-lucide="file-heart" style="width:14px;height:14px;"></i> View Record
+      </button>
+    </div>`}
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function checkIn(id) {
+  const a = appointments.find(x => x.id === id);
+  if (a) { a.status = 'confirmed'; closeModal(); renderView(); }
+}
+function cancelAppt(id) {
+  if (confirm('Cancel this appointment?')) {
+    const a = appointments.find(x => x.id === id);
+    if (a) { a.status = 'cancelled'; closeModal(); renderView(); }
+  }
+}
+function reschedule(id) { closeModal(); openNewModal(id); }
+function editAppt(id) { closeModal(); openNewModal(id); }
+
+/* ══ NEW / EDIT BOOKING MODAL ══ */
+function openNewModal(editId = null) {
+  const a = editId ? appointments.find(x => x.id === editId) : null;
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const dateVal = a ? `${a.date.getFullYear()}-${String(a.date.getMonth()+1).padStart(2,'0')}-${String(a.date.getDate()).padStart(2,'0')}` :
+    `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+  const timeVal = a ? `${String(a.hour).padStart(2,'0')}:${String(a.min).padStart(2,'0')}` : '09:00';
+
+  document.getElementById('modal-title').textContent = a ? 'Edit Appointment' : 'Book Appointment';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="m-field">
+      <label>Patient name</label>
+      <input type="text" id="m-patient" placeholder="Full name" value="${a ? a.name : ''}"/>
+    </div>
+    <div class="m-field-row">
+      <div class="m-field">
+        <label>Date</label>
+        <input type="date" id="m-date" value="${dateVal}"/>
+      </div>
+      <div class="m-field">
+        <label>Time</label>
+        <input type="time" id="m-time" value="${timeVal}"/>
+      </div>
+    </div>
+    <div class="m-field-row">
+      <div class="m-field">
+        <label>Doctor</label>
+        <select id="m-doctor">
+          ${DOCTORS.map(d => `<option ${a && a.doctor === d ? 'selected' : ''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="m-field">
+        <label>Duration</label>
+        <select id="m-duration">
+          ${[15,20,30,45,60].map(d => `<option value="${d}" ${a && a.duration === d ? 'selected' : ''}>${d} min</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="m-field">
+      <label>Appointment type</label>
+      <div class="m-type-grid">
+        ${TYPES.map(t => `<button class="m-type-btn${a && a.type === t ? ' selected' : ''}" onclick="selectType(this,'${t}')">${t}</button>`).join('')}
+      </div>
+      <input type="hidden" id="m-type" value="${a ? a.type : 'Consultation'}"/>
+    </div>
+    <div class="m-field">
+      <label>Room / Location</label>
+      <input type="text" id="m-room" placeholder="e.g. Room 3, Consultation A" value="${a ? a.room : ''}"/>
+    </div>
+    <div class="m-field">
+      <label>Notes <span style="font-size:10px;color:var(--slate);font-weight:400;text-transform:none;">(optional)</span></label>
+      <textarea id="m-notes" placeholder="Any relevant notes for this appointment..." style="height:72px;">${a ? a.notes : ''}</textarea>
+    </div>
+    <div class="m-actions">
+      <button class="btn-cancel-m" onclick="closeModal()">Cancel</button>
+      <button class="btn-save-m" onclick="saveAppt(${editId || 'null'})">${a ? 'Save changes' : 'Book appointment'}</button>
+    </div>
+  `;
+  // Pre-select first type if new
+  if (!a) document.querySelector('.m-type-btn')?.classList.add('selected');
+  document.getElementById('modal-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function selectType(btn, type) {
+  document.querySelectorAll('.m-type-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('m-type').value = type;
+}
+
+function saveAppt(editId) {
+  const patient = document.getElementById('m-patient').value.trim();
+  const dateVal = document.getElementById('m-date').value;
+  const timeVal = document.getElementById('m-time').value;
+  const doctor  = document.getElementById('m-doctor').value;
+  const dur     = parseInt(document.getElementById('m-duration').value);
+  const type    = document.getElementById('m-type').value || 'Consultation';
+  const room    = document.getElementById('m-room').value.trim() || 'TBD';
+  const notes   = document.getElementById('m-notes').value;
+
+  if (!patient || !dateVal || !timeVal) { alert('Please fill in patient name, date, and time.'); return; }
+
+  const [y,m,d] = dateVal.split('-').map(Number);
+  const [h,min] = timeVal.split(':').map(Number);
+
+  if (editId) {
+    const a = appointments.find(x => x.id === editId);
+    if (a) { Object.assign(a, { name: patient, date: new Date(y, m-1, d), hour: h, min, duration: dur, doctor, type, room, notes }); }
+  } else {
+    appointments.push({ id: Date.now(), name: patient, doctor, type, date: new Date(y, m-1, d), hour: h, min, duration: dur, status: 'pending', notes, room });
+  }
+
+  closeModal();
+  renderView();
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+/* ══ SIDEBAR ══ */
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+/* ══ RESPONSIVE ══ */
+window.addEventListener('resize', () => {
+  if (window.innerWidth >= 1024) closeSidebar();
+  document.getElementById('book-label').textContent = window.innerWidth < 600 ? 'Book' : 'Book Appointment';
+  renderView();
+});
+
+/* ══ INIT ══ */
+setView('month');
+</script>
+</body>
+</html>
